@@ -57,8 +57,8 @@ async def test_history_queries_only_see_this_athlete_and_window(conn: Connection
     await insert_session(conn, other, started_at=NOW - timedelta(days=1))
     since = NOW - timedelta(days=14)
 
-    per_discipline = await sessions_per_discipline(conn, me, since=since)
-    recent = await recent_sessions(conn, me, since=since)
+    per_discipline = await sessions_per_discipline(conn, me, since=since, until=NOW)
+    recent = await recent_sessions(conn, me, since=since, until=NOW)
 
     assert per_discipline == [{"discipline": "testsport", "sessions": 1, "minutes": 90}]
     assert [r["duration_min"] for r in recent] == [90]
@@ -75,7 +75,7 @@ async def test_weekly_load_uses_the_athletes_local_week(conn: Connection) -> Non
         conn, me, started_at=datetime(2026, 10, 4, 19, 0, tzinfo=UTC), duration_min=60, rpe=7
     )
 
-    weeks = await weekly_load(conn, me, since=NOW - timedelta(days=14))
+    weeks = await weekly_load(conn, me, since=NOW - timedelta(days=14), until=NOW)
 
     assert weeks == [
         {"week_start": date(2026, 9, 28), "sessions": 1, "minutes": 60, "load": 300},
@@ -103,3 +103,25 @@ async def test_records_an_agent_run(conn: Connection, athlete: Athlete) -> None:
     assert row is not None
     assert row["tool_calls"][0]["tool"] == "query_history"
     assert (row["input_tokens"], row["output_tokens"], row["error"]) == (10, 3, None)
+
+
+async def test_recent_sessions_report_local_time_and_weekday(conn: Connection) -> None:
+    me = await create_athlete(conn, name="Me", telegram_chat_id=new_chat_id())
+    # 19:00 UTC on Sunday is 05:00 on Monday in Brisbane.
+    await insert_session(conn, me, started_at=datetime(2026, 10, 4, 19, 0, tzinfo=UTC))
+
+    [session] = await recent_sessions(conn, me, since=NOW - timedelta(days=7), until=NOW)
+
+    assert session["started_at"] == datetime(2026, 10, 5, 5, 0)
+    assert session["weekday"] == "Monday"
+
+
+async def test_history_excludes_sessions_after_until(conn: Connection) -> None:
+    me = await create_athlete(conn, name="Me", telegram_chat_id=new_chat_id())
+    await insert_session(conn, me, started_at=NOW - timedelta(days=1))
+
+    rows = await sessions_per_discipline(
+        conn, me, since=NOW - timedelta(days=7), until=NOW - timedelta(days=2)
+    )
+
+    assert rows == []

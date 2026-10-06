@@ -15,6 +15,7 @@ from coach.core.llm import get_chat_model
 from coach.core.models import Athlete
 from coach.core.registry import Registry
 from coach.core.repo import create_athlete
+from coach.core.tools import history_window
 from tests.factories import insert_session, new_chat_id
 from tests.fakes import FakeModule, fake_lookup, scripted
 
@@ -141,3 +142,51 @@ def test_chat_model_uses_the_configured_claude_model() -> None:
     # Two model calls per tool turn must fit inside Vercel's 300s limit, retries included.
     assert model.default_request_timeout is not None
     assert 2 * model.default_request_timeout * (model.max_retries + 1) <= 240
+
+
+BRISBANE = "Australia/Brisbane"
+# Monday 00:30 in Brisbane is still Sunday 14:30 in UTC.
+MONDAY_EARLY = datetime(2026, 10, 4, 14, 30, tzinfo=UTC)
+
+
+def test_this_week_starts_at_local_monday_midnight() -> None:
+    since, until = history_window("this_week", 14, MONDAY_EARLY, BRISBANE)
+
+    assert since == datetime(2026, 10, 4, 14, 0, tzinfo=UTC)  # Mon 00:00 Brisbane
+    assert until == MONDAY_EARLY
+
+
+def test_last_week_is_the_previous_local_monday_to_monday() -> None:
+    since, until = history_window("last_week", 14, MONDAY_EARLY, BRISBANE)
+
+    assert (since, until) == (
+        datetime(2026, 9, 27, 14, 0, tzinfo=UTC),
+        datetime(2026, 10, 4, 14, 0, tzinfo=UTC),
+    )
+
+
+def test_last_n_days_is_a_rolling_window() -> None:
+    assert history_window("last_n_days", 3, NOW, BRISBANE) == (NOW - timedelta(days=3), NOW)
+
+
+async def test_this_week_does_not_count_sunday_night(pool: Pool, athlete: Athlete) -> None:
+    async with pool.connection() as conn:
+        # Sunday 22:00 in Brisbane, two and a half hours before MONDAY_EARLY.
+        await insert_session(conn, athlete, started_at=datetime(2026, 10, 4, 12, 0, tzinfo=UTC))
+    model = scripted(
+        call("query_history", {"kind": "per_discipline", "period": "this_week"}, "c1"),
+        call("query_history", {"kind": "per_discipline", "period": "last_week"}, "c2"),
+        "done",
+    )
+    graph = build_graph(model, Registry([]))
+    early = CoachContext(
+        athlete=athlete, pool=pool, registry=Registry([]), now=lambda: MONDAY_EARLY
+    )
+
+    out = await graph.ainvoke({"messages": [HumanMessage("this week?")]}, context=early)
+
+    results = {
+        m.tool_call_id: json.loads(m.text) for m in out["messages"] if isinstance(m, ToolMessage)
+    }
+    assert results["c1"] == []
+    assert results["c2"] == [{"discipline": "testsport", "sessions": 1, "minutes": 60}]

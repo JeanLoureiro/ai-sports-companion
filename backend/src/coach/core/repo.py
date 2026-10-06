@@ -61,43 +61,54 @@ async def claim_update(conn: Connection, update_id: int) -> bool:
 
 
 async def recent_sessions(
-    conn: Connection, athlete: Athlete, *, since: datetime, limit: int = 50
+    conn: Connection, athlete: Athlete, *, since: datetime, until: datetime, limit: int = 50
 ) -> list[dict[str, Any]]:
-    """Sessions since a moment, newest first."""
+    """Sessions in ``[since, until)``, newest first, with local start time and weekday."""
     cur = await conn.execute(
-        "select discipline, started_at, duration_min, rpe, summary from sessions "
-        "where athlete_id = %(athlete_id)s and started_at >= %(since)s "
-        "order by started_at desc limit %(limit)s",
-        {"athlete_id": athlete.id, "since": since, "limit": limit},
+        "select discipline, started_at at time zone %(tz)s as started_at, "
+        "to_char(started_at at time zone %(tz)s, 'FMDay') as weekday, "
+        "duration_min, rpe, summary from sessions "
+        "where athlete_id = %(athlete_id)s "
+        "and started_at >= %(since)s and started_at < %(until)s "
+        "order by sessions.started_at desc limit %(limit)s",
+        {
+            "tz": athlete.timezone,
+            "athlete_id": athlete.id,
+            "since": since,
+            "until": until,
+            "limit": limit,
+        },
     )
     return await cur.fetchall()
 
 
 async def sessions_per_discipline(
-    conn: Connection, athlete: Athlete, *, since: datetime
+    conn: Connection, athlete: Athlete, *, since: datetime, until: datetime
 ) -> list[dict[str, Any]]:
-    """Session count and minutes per discipline since a moment."""
+    """Session count and minutes per discipline in ``[since, until)``."""
     cur = await conn.execute(
         "select discipline, count(*)::int as sessions, "
         "coalesce(sum(duration_min), 0)::int as minutes from sessions "
-        "where athlete_id = %(athlete_id)s and started_at >= %(since)s "
+        "where athlete_id = %(athlete_id)s "
+        "and started_at >= %(since)s and started_at < %(until)s "
         "group by discipline order by discipline",
-        {"athlete_id": athlete.id, "since": since},
+        {"athlete_id": athlete.id, "since": since, "until": until},
     )
     return await cur.fetchall()
 
 
 async def weekly_load(
-    conn: Connection, athlete: Athlete, *, since: datetime
+    conn: Connection, athlete: Athlete, *, since: datetime, until: datetime
 ) -> list[dict[str, Any]]:
-    """Sessions, minutes and load (minutes x RPE) per week, in the athlete's time zone."""
+    """Sessions, minutes and load (minutes x RPE) per local week in ``[since, until)``."""
     cur = await conn.execute(
         "select (date_trunc('week', started_at at time zone %(tz)s))::date as week_start, "
         "count(*)::int as sessions, coalesce(sum(duration_min), 0)::int as minutes, "
         "coalesce(sum(duration_min * rpe), 0)::int as load from sessions "
-        "where athlete_id = %(athlete_id)s and started_at >= %(since)s "
+        "where athlete_id = %(athlete_id)s "
+        "and started_at >= %(since)s and started_at < %(until)s "
         "group by 1 order by 1",
-        {"tz": athlete.timezone, "athlete_id": athlete.id, "since": since},
+        {"tz": athlete.timezone, "athlete_id": athlete.id, "since": since, "until": until},
     )
     return await cur.fetchall()
 

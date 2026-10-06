@@ -196,7 +196,7 @@ The full schema is in the project plan; the core tables are:
 | `checkpoints`, `checkpoint_*` | LangGraph's thread state. |
 
 Migrations are plain SQL files run by `coach migrate`, recorded in `coach_migrations`, each applied in its own transaction.
-Time-based questions ("this week") are answered in the athlete's time zone in SQL, not in UTC.
+Time-based questions ("this week", "last week") use calendar weeks that start Monday 00:00 in the athlete's time zone, never UTC, and session times are reported in local time with their weekday.
 
 ## Security
 
