@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolRuntime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from coach.core.context import CoachContext
 from coach.core.db import Connection
@@ -70,6 +70,9 @@ async def get_program(runtime: ToolRuntime[CoachContext]) -> str:
 
 class LiftLog(BaseModel):
     """One exercise the athlete mentioned. Fill only what they said."""
+
+    # Unknown fields (e.g. rpe inside a lift) must fail loudly, not vanish.
+    model_config = ConfigDict(extra="forbid")
 
     exercise: str = Field(description="As the athlete said it, Portuguese or English")
     load_kg: float | None = Field(default=None, ge=0, description="Dumbbell weight in kg")
@@ -141,7 +144,13 @@ def _started_at(value: datetime | None, ctx: CoachContext) -> datetime:
 @tool
 async def log_gym_session(
     runtime: ToolRuntime[CoachContext],
-    day: Annotated[str | None, Field(description="Program day if named: A, B or C")] = None,
+    day: Annotated[
+        str | None,
+        Field(
+            description="Always pass this when the athlete names the session "
+            "('Treino B', 'B', 'session C'): A, B or C. Omit only if they did not name it."
+        ),
+    ] = None,
     started_at: Annotated[
         datetime | None, Field(description="Local date and time; omit for now")
     ] = None,

@@ -245,3 +245,40 @@ async def test_undo_frees_the_program_slot(pool: Pool, athlete: Athlete) -> None
 
     assert result["next_session"]["label"] == "Week 1 Treino A"
     assert result["progress"]["done"] == 0
+
+
+async def test_a_field_the_tool_does_not_know_is_an_error_not_a_silent_drop(
+    pool: Pool, athlete: Athlete
+) -> None:
+    # The model once nested rpe inside a lift; dropping it silently loses the athlete's RPE.
+    await seeded(pool, athlete)
+
+    model = scripted(
+        AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "log_gym_session",
+                    "id": "x1",
+                    "args": {"lifts": [{"exercise": "goblet", "load_kg": 22, "rpe": 7}]},
+                }
+            ],
+        ),
+        "ok",
+    )
+    out = await build_graph(model, GYM).ainvoke(
+        {"messages": [HumanMessage("gym")]}, context=ctx(athlete, pool)
+    )
+
+    tool_message = next(m for m in out["messages"] if isinstance(m, ToolMessage))
+    assert tool_message.status == "error"
+    assert "rpe" in tool_message.text
+    assert await gym_rows(pool, athlete) == []
+
+
+def test_the_tool_tells_the_model_to_pass_the_named_day() -> None:
+    from coach.modules.gym.tools import log_gym_session
+
+    schema = log_gym_session.args
+    assert "always" in schema["day"]["description"].lower()
+    assert "Treino B" in GymModule().prompt(Athlete(UUID(int=1), "J", "Australia/Brisbane", 1))

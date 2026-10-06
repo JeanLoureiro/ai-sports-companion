@@ -5,11 +5,12 @@
       {
         "name": "log_gym_session",
         "args": {
+          "day": "A",
+          "rpe": 7,
           "lifts": [
             {
               "exercise": "Agachamento goblet",
-              "load_kg": 22,
-              "rpe": 7
+              "load_kg": 22
             }
           ]
         }
@@ -19,6 +20,8 @@
       {
         "name": "log_gym_session",
         "args": {
+          "day": "B",
+          "rpe": 8,
           "lifts": [
             {
               "exercise": "Agachamento terra sumo",
@@ -28,8 +31,7 @@
               "exercise": "Serrote",
               "load_kg": 18
             }
-          ],
-          "rpe": 8
+          ]
         }
       }
     ],
@@ -43,6 +45,7 @@
       {
         "name": "log_gym_session",
         "args": {
+          "day": "C",
           "lifts": [
             {
               "exercise": "Side lunge",
@@ -63,19 +66,14 @@
               "swapped_to": "push ups"
             },
             {
-              "exercise": "Serrote",
+              "exercise": "Remada curvada",
               "load_kg": 20
             }
           ]
         }
       }
     ],
-    "gym-06": [
-      {
-        "name": "get_program",
-        "args": {}
-      }
-    ],
+    "gym-06": [],
     "gym-07": [
       {
         "name": "log_gym_session",
@@ -96,6 +94,7 @@
       {
         "name": "log_gym_session",
         "args": {
+          "day": "C",
           "lifts": [
             {
               "exercise": "Stiff unilateral",
@@ -118,6 +117,7 @@
         "name": "log_gym_session",
         "args": {
           "day": "A",
+          "rpe": 9,
           "lifts": [
             {
               "exercise": "Agachamento goblet",
@@ -135,8 +135,7 @@
               "exercise": "Afundo",
               "load_kg": 12
             }
-          ],
-          "rpe": 9
+          ]
         }
       }
     ],
@@ -194,6 +193,7 @@
       {
         "name": "log_gym_session",
         "args": {
+          "day": "C",
           "rpe": 6
         }
       }

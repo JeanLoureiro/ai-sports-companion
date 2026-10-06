@@ -16,7 +16,7 @@ exercises:
   - {name: Aterrisagem solo, aliases: [landing drill, single leg landing, landings], pattern: plyometric, load_areas: [knees, ankles]}
   - {name: Suitcase carry, aliases: [suitcase walk], pattern: carry, equipment: [dumbbell], load_areas: [core]}
   - {name: Agachamento goblet, aliases: [goblet squat, goblet], pattern: squat, equipment: [dumbbell], load_areas: [knees, hips]}
-  - {name: Remada curvada, aliases: [bent over row, bent over dumbbell row, dumbbell row], pattern: pull, equipment: [dumbbell], load_areas: [upper back, lower back]}
+  - {name: Remada curvada, aliases: [bent over row, bent over dumbbell row, dumbbell row, row, rows], pattern: pull, equipment: [dumbbell], load_areas: [upper back, lower back]}
   - {name: Supino reto com halter, aliases: [dumbbell bench press, bench press, flat dumbbell press, bench], pattern: push, equipment: [dumbbell, bench], load_areas: [shoulders]}
   - {name: Afundo, aliases: [lunge, lunges, split squat], pattern: lunge, equipment: [dumbbell], load_areas: [knees, hips]}
   - {name: Agachamento terra sumo, aliases: [sumo deadlift, sumo squat, sumo], pattern: hinge, equipment: [dumbbell], load_areas: [hips, lower back]}

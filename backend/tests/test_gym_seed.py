@@ -104,3 +104,11 @@ def test_check_mode_validates_without_a_database(capsys: pytest.CaptureFixture[s
     main(["--program", str(SAMPLE), "--check"])
 
     assert "4 sessions over 2 weeks" in capsys.readouterr().out
+
+
+def test_plain_rows_means_the_bent_over_row() -> None:
+    index = library_index()
+
+    remada = index.resolve("Remada curvada")
+    assert index.resolve("rows") == remada
+    assert index.resolve("row") == remada
