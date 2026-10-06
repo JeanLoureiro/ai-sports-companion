@@ -100,6 +100,14 @@ Only the transport differs between local and production.
 The tick asks each module's jobs whether they are due in the athlete's local time, inserts a `job_runs` row keyed on (athlete, job, local date) before running, and skips the job if that row already exists.
 Jobs run the agent with `trigger = 'schedule'` on the same thread as chat.
 
+### Undo
+
+Every log reply carries an inline Undo button whose callback data is `undo:<session id>`.
+Tools put buttons there by appending to `CoachContext.reply_buttons`; the handler sends them under the last chunk of the reply.
+A tap arrives as a `callback_query` update and goes through the same allowlist and `update_id` dedupe as messages.
+The core deletes the `sessions` row only if it belongs to that athlete; module rows go with it through foreign keys (a gym program slot is freed because `program_sessions.completed_session_id` is `on delete set null`), so the core never knows module tables.
+The athlete gets "Undone." and a chat line, and the same line is added to the thread so the agent knows.
+
 ### Confirmations **(planned, week 5)**
 
 Program changes never block the conversation.
@@ -119,12 +127,12 @@ backend/src/coach/
   core/
     config.py          Settings from COACH_* env vars (secrets are SecretStr)
     db.py              psycopg async pool (autocommit, dict rows, no prepared statements)
-    models.py          Athlete, AgentRun
+    models.py          Athlete, AgentRun, ReplyButton
     migrations.py      runs core then module SQL files; enables RLS on every public table
     migrations/        core SQL
     repo.py            all SQL for core tables
-    registry.py        DisciplineModule protocol, ScheduledJob, Registry, ENABLED
-    context.py         CoachContext: athlete, pool, registry, clock
+    registry.py        DisciplineModule protocol, ScheduledJob, Registry, default_registry
+    context.py         CoachContext: athlete, pool, registry, clock, reply buttons
     prompt.py          system prompt assembly
     tools.py           core tools (query_history)
     llm.py             the only place that names a model provider
@@ -132,10 +140,21 @@ backend/src/coach/
     turn.py            run_turn: one turn plus its agent_runs record
     telegram.py        Bot API client and update models
     deps.py            Deps and build_deps: everything a request needs
-    handler.py         handle_update: allowlist, dedupe, turn, reply
+    handler.py         handle_update: allowlist, dedupe, turn, reply, Undo taps
     polling.py         local long polling
+    evals.py           tool-call evals: live, record, replay (python -m coach.core.evals)
   modules/
-    gym/               planned, week 2
+    gym/
+      module.py        GymModule: tools, prompt, context, evals
+      library.py       exercise library and name matching (Portuguese names, English aliases)
+      program.py       program file model and validation
+      repo.py          gym SQL
+      tools.py         get_program, log_gym_session
+      seed.py          python -m coach.modules.gym.seed
+      exercises.yaml   public library
+      programs/        sample.yaml (public); real programs are private and git-ignored
+      migrations/      gym SQL
+      evals/           extraction.yaml + recordings/
     surf/              planned, week 3
     bjj/               planned, phase 2
 dashboard/             planned, week 7
@@ -158,7 +177,8 @@ A discipline is a folder under `coach/modules/` that implements `DisciplineModul
 | `jobs()` | Scheduled jobs with an `is_due(athlete, local_time)` check. |
 | `evals()` | Public synthetic eval cases. |
 
-Enabling a module means adding it to `ENABLED` in `registry.py`.
+Enabling a module means adding it to `default_registry()` in `registry.py` (a local import, because modules import from the core).
+Modules can also put inline buttons under the reply through `CoachContext.reply_buttons`.
 The `Registry` rejects duplicate module names and duplicate tool names at startup, and `build_graph` rejects a module tool that shadows a core tool.
 
 Rules that keep "add a sport without touching the core" true:
@@ -194,6 +214,16 @@ The full schema is in the project plan; the core tables are:
 | `eval_cases`, `eval_runs` | Private real eval cases; results of every eval run. |
 | `coach_migrations` | Which migration files have run. |
 | `checkpoints`, `checkpoint_*` | LangGraph's thread state. |
+
+The gym module adds:
+
+| Table | Holds |
+| --- | --- |
+| `exercises` | The library per athlete: name, aliases, pattern, equipment, load areas. |
+| `programs` | Seeded programs; at most one active per athlete. |
+| `program_sessions` | The ordered sequence; a session is pending until a logged session completes it or it is skipped. |
+| `program_exercises` | Each session's prescriptions: block (prep or main), sets, reps, rest, tempo, notes. |
+| `gym_details` | Per logged session: the program session it completed and the main lifts with any loads, swaps and skips. |
 
 Migrations are plain SQL files run by `coach migrate`, recorded in `coach_migrations`, each applied in its own transaction.
 Time-based questions ("this week", "last week") use calendar weeks that start Monday 00:00 in the athlete's time zone, never UTC, and session times are reported in local time with their weekday.
@@ -232,7 +262,7 @@ Environment variables (`backend/.env.example` lists them):
 - Tests run against a real local Supabase Postgres (`supabase db start`), the same image as production, so RLS, `auth.uid()` and pgvector behave the same. Tests that need isolation run inside a rolled-back transaction; the rest use fresh athletes.
 - The model is replaced by a scripted fake that records every prompt it receives; the Telegram API is replaced by an httpx mock transport. No test touches the network.
 - Every commit passes ruff, ruff format, mypy (strict) and pytest, enforced by pre-commit and by GitHub Actions.
-- **(planned, week 2 on)** Eval sets: on pull requests a synthetic set replays recorded model responses at no cost; live runs on both sets happen on manual dispatch and weekly, writing to `eval_runs`.
+- Evals: each module lists YAML eval sets of messages and the tool arguments they should produce. `python -m coach.core.evals --mode live --record` asks Claude once per case and records the answers next to the set; CI replays the recordings at no cost. Scores are field-level precision and recall plus invented fields; `--save-run` writes them to `eval_runs`. Private real cases and scheduled live runs come later.
 
 ## Observability
 
