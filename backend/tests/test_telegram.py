@@ -160,3 +160,17 @@ async def test_build_deps_wires_the_real_stack_without_network_calls() -> None:
         assert deps.registry.modules == ()
         assert isinstance(deps.telegram, TelegramClient)
         assert deps.graph.checkpointer is not None
+
+
+async def test_a_failed_typing_indicator_does_not_cost_the_reply(
+    pool: Pool, athlete: Athlete
+) -> None:
+    assert athlete.telegram_chat_id is not None
+    recorder = TelegramRecorder(fail_on="sendChatAction")
+    deps = make_deps(pool, scripted("Still here."), recorder, allowed=[athlete.telegram_chat_id])
+
+    await handle_update(
+        deps, Update.model_validate(text_update(new_update_id(), athlete.telegram_chat_id))
+    )
+
+    assert recorder.sent_texts() == ["Still here."]

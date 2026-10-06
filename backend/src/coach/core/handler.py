@@ -2,10 +2,12 @@
 
 import logging
 
+import httpx
+
 from coach.core.context import CoachContext
 from coach.core.deps import Deps
 from coach.core.repo import claim_update, get_athlete_by_chat_id
-from coach.core.telegram import Update
+from coach.core.telegram import TelegramError, Update
 from coach.core.turn import run_turn
 
 logger = logging.getLogger(__name__)
@@ -34,7 +36,10 @@ async def handle_update(deps: Deps, update: Update) -> None:
     if not message.text:
         await deps.telegram.send_message(chat_id, UNSUPPORTED_REPLY)
         return
-    await deps.telegram.send_typing(chat_id)
+    try:
+        await deps.telegram.send_typing(chat_id)
+    except (TelegramError, httpx.HTTPError) as err:
+        logger.warning("typing indicator failed (%s); answering anyway", type(err).__name__)
     ctx = CoachContext(athlete=athlete, pool=deps.pool, registry=deps.registry)
     result = await run_turn(deps.graph, ctx, message.text, model_name=deps.settings.agent_model)
     await deps.telegram.send_message(chat_id, result.reply)

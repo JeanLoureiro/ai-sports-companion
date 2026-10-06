@@ -173,3 +173,16 @@ def text_update(update_id: int, chat_id: int, text: str | None = "hi") -> dict[s
     else:
         message["photo"] = [{"file_id": "abc", "width": 1, "height": 1}]
     return {"update_id": update_id, "message": message}
+
+
+class BrokenChatModel(FakeChatModel):
+    """A model integration that fails with something other than an API error."""
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        raise RuntimeError("boom")

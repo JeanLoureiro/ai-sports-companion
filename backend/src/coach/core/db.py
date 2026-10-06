@@ -18,6 +18,8 @@ def create_pool(database_url: str, *, max_size: int = 4) -> Pool:
         conninfo=database_url,
         connection_class=AsyncConnection[DictRow],
         kwargs={"autocommit": True, "prepare_threshold": None, "row_factory": dict_row},
+        # A resumed serverless instance may hold connections the pooler already dropped.
+        check=AsyncConnectionPool.check_connection,
         min_size=1,
         max_size=max_size,
         open=False,

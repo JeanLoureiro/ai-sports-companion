@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-import anthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 
@@ -37,7 +36,7 @@ async def run_turn(
     model_name: str,
     trigger: Trigger = "message",
 ) -> TurnResult:
-    """Run one turn on the athlete's single thread; never raises for model API failures."""
+    """Run one turn on the athlete's single thread; any failure becomes the fallback reply."""
     config: RunnableConfig = {"configurable": {"thread_id": str(ctx.athlete.id)}}
     snapshot = await graph.aget_state(config)
     seen = {m.id for m in snapshot.values.get("messages", [])}
@@ -48,7 +47,7 @@ async def run_turn(
         out = await graph.ainvoke({"messages": [HumanMessage(content=text)]}, config, context=ctx)
         new = [m for m in out["messages"] if m.id not in seen]
         reply = _final_reply(new)
-    except anthropic.APIError as err:
+    except Exception as err:  # noqa: BLE001 - the athlete always gets an answer and a record
         error = f"{type(err).__name__}: {err}"
         reply = FALLBACK_REPLY
     usages = [m.usage_metadata for m in new if isinstance(m, AIMessage) and m.usage_metadata]

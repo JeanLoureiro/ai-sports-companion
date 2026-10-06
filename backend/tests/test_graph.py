@@ -138,3 +138,6 @@ def test_chat_model_uses_the_configured_claude_model() -> None:
 
     assert isinstance(model, ChatAnthropic)
     assert model.model == "claude-haiku-4-5-20251001"
+    # Two model calls per tool turn must fit inside Vercel's 300s limit, retries included.
+    assert model.default_request_timeout is not None
+    assert 2 * model.default_request_timeout * (model.max_retries + 1) <= 240

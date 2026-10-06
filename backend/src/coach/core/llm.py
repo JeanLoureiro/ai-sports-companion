@@ -12,6 +12,7 @@ def get_chat_model(settings: Settings) -> BaseChatModel:
         model=settings.agent_model,
         api_key=settings.anthropic_api_key,
         max_tokens=1024,
-        timeout=60.0,
-        max_retries=2,
+        # Two calls per tool turn, retries included, must fit inside Vercel's 300s limit.
+        timeout=45.0,
+        max_retries=1,
     )

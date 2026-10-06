@@ -1,9 +1,11 @@
 from pathlib import Path
 
 import pytest
+from psycopg import AsyncConnection
 
-from coach.core.db import Connection, Pool
+from coach.core.db import Connection, Pool, create_pool
 from coach.core.migrations import CORE_MIGRATIONS, migrate_all
+from tests.conftest import TEST_DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
@@ -45,3 +47,22 @@ async def test_module_migrations_run_after_core(pool: Pool, tmp_path: Path) -> N
         async with pool.connection() as conn:
             await conn.execute("drop table if exists fake_module_rows")
             await conn.execute("delete from coach_migrations where id = 'fake/0001_fake.sql'")
+
+
+async def test_pool_replaces_a_connection_the_server_dropped() -> None:
+    small = create_pool(TEST_DATABASE_URL, max_size=1)
+    await small.open(wait=True)
+    try:
+        async with small.connection() as connection:
+            cur = await connection.execute("select pg_backend_pid() as pid")
+            row = await cur.fetchone()
+            assert row is not None
+            pid = row["pid"]
+        async with await AsyncConnection.connect(TEST_DATABASE_URL, autocommit=True) as killer:
+            await killer.execute("select pg_terminate_backend(%s)", (pid,))
+
+        async with small.connection() as connection:
+            cur = await connection.execute("select 1 as ok")
+            assert await cur.fetchone() == {"ok": 1}
+    finally:
+        await small.close()
