@@ -1,9 +1,18 @@
 """Test doubles shared across the suite."""
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
+from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.language_models import LanguageModelInput
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.outputs import ChatResult
+from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool, tool
+from pydantic import Field
 
 from coach.core.db import Connection
 from coach.core.models import Athlete
@@ -40,3 +49,35 @@ class FakeModule:
 
     def evals(self) -> list[Path]:
         return []
+
+
+class FakeChatModel(GenericFakeChatModel):
+    """Scripted chat model that records every prompt it receives."""
+
+    seen: list[list[BaseMessage]] = Field(default_factory=list)
+
+    def bind_tools(
+        self,
+        tools: Sequence[dict[str, Any] | type | Callable[..., Any] | BaseTool],
+        *,
+        tool_choice: str | None = None,
+        **kwargs: Any,
+    ) -> Runnable[LanguageModelInput, AIMessage]:
+        return self
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        self.seen.append(list(messages))
+        return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+
+def scripted(*replies: AIMessage | str) -> FakeChatModel:
+    """A fake model that answers with ``replies`` in order."""
+    return FakeChatModel(
+        messages=iter([r if isinstance(r, AIMessage) else AIMessage(content=r) for r in replies])
+    )
