@@ -70,7 +70,14 @@ class TelegramClient:
     async def set_webhook(self, url: str, secret: str) -> None:
         """Point Telegram at the deployed webhook."""
         await self.call(
-            "setWebhook", {"url": url, "secret_token": secret, "allowed_updates": ["message"]}
+            "setWebhook",
+            {
+                "url": url,
+                "secret_token": secret,
+                "allowed_updates": ["message"],
+                # One athlete, one thread: concurrent turns would overwrite each other's memory.
+                "max_connections": 1,
+            },
         )
 
     async def delete_webhook(self) -> None:

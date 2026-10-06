@@ -174,3 +174,15 @@ async def test_a_failed_typing_indicator_does_not_cost_the_reply(
     )
 
     assert recorder.sent_texts() == ["Still here."]
+
+
+async def test_webhook_delivers_one_update_at_a_time() -> None:
+    # Concurrent turns on the one thread would make the coach forget a message.
+    recorder = TelegramRecorder()
+
+    await recorder.client().set_webhook("https://coach.example/telegram", "s3cret")
+
+    [(method, payload)] = recorder.calls
+    assert method == "setWebhook"
+    assert payload["max_connections"] == 1
+    assert payload["secret_token"] == "s3cret"
