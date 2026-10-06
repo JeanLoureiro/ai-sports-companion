@@ -29,10 +29,7 @@ async def pool() -> AsyncIterator[Pool]:
         pytest.fail("No test database. Start it with `supabase db start` from the repo root.")
     await migrate_all(pool, [("core", CORE_MIGRATIONS)])
     async with pool.connection() as conn:
-        await conn.execute(
-            "truncate athletes, processed_updates, eval_cases, eval_runs, "
-            "checkpoints, checkpoint_writes, checkpoint_blobs cascade"
-        )
+        # Tests share the local development database: create only, never delete.
         await conn.execute(
             "insert into disciplines (name, label) values ('testsport', 'Test sport') "
             "on conflict (name) do nothing"
