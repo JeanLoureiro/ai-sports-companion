@@ -5,8 +5,9 @@ import pytest
 from psycopg_pool import PoolTimeout
 
 from coach.core.db import Connection, Pool, create_pool
-from coach.core.migrations import CORE_MIGRATIONS, migrate_all
+from coach.core.migrations import migrate_all
 from coach.core.models import Athlete
+from coach.core.registry import default_registry
 from coach.core.repo import create_athlete
 from tests.factories import new_chat_id
 
@@ -27,12 +28,9 @@ async def pool() -> AsyncIterator[Pool]:
         await pool.open(wait=True, timeout=10)
     except PoolTimeout:
         pytest.fail("No test database. Start it with `supabase db start` from the repo root.")
-    await migrate_all(pool, [("core", CORE_MIGRATIONS)])
+    await migrate_all(pool, default_registry().migration_dirs())
     async with pool.connection() as conn:
-        await conn.execute(
-            "truncate athletes, processed_updates, eval_cases, eval_runs, "
-            "checkpoints, checkpoint_writes, checkpoint_blobs cascade"
-        )
+        # Tests share the local development database: create only, never delete.
         await conn.execute(
             "insert into disciplines (name, label) values ('testsport', 'Test sport') "
             "on conflict (name) do nothing"

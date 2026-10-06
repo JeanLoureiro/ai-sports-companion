@@ -93,10 +93,8 @@ class Registry:
         return [("core", CORE_MIGRATIONS), *((m.name, m.migrations) for m in self._modules)]
 
 
-# Enabled discipline modules, in migration order. Week 2 adds GymModule(), week 3 SurfModule().
-ENABLED: list[DisciplineModule] = []
-
-
 def default_registry() -> Registry:
-    """The registry built from ``ENABLED``."""
-    return Registry(ENABLED)
+    """The enabled discipline modules, in migration order. Week 3 adds SurfModule()."""
+    from coach.modules.gym.module import GymModule  # local: modules import from the core
+
+    return Registry([GymModule()])

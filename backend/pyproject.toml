@@ -11,6 +11,7 @@ dependencies = [
     "langgraph-checkpoint-postgres>=3.1.2",
     "psycopg[binary,pool]>=3.3.6",
     "pydantic-settings>=2.15.0",
+    "pyyaml>=6.0.3",
 ]
 
 [project.scripts]
@@ -54,4 +55,5 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.9",
+    "types-pyyaml>=6.0.12.20260906",
 ]

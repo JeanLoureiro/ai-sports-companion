@@ -17,7 +17,11 @@ cp .env.example .env              # skip if you ran the wizard; it already wrote
 uv sync
 uv run coach migrate
 uv run coach add-athlete --name "Your Name" --chat-id <your Telegram chat id>
+uv run python -m coach.modules.gym.seed --program src/coach/modules/gym/programs/sample.yaml --chat-id <id>
 uv run coach poll                 # long polling; use a separate dev bot
 ```
 
 Quality gate: `uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest`.
+
+Evals: `uv run python -m coach.core.evals` replays the recorded model answers; `--mode live --record` re-records them (uses the Anthropic key).
+Your own program file goes in `docs/trainings/` (git-ignored) and is seeded the same way.

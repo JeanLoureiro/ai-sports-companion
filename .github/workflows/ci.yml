@@ -28,3 +28,6 @@ jobs:
       - name: Tests
         working-directory: backend
         run: uv run pytest --cov=coach --cov-report=term-missing
+      - name: Evals (replay)
+        working-directory: backend
+        run: uv run python -m coach.core.evals

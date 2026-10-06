@@ -10,7 +10,7 @@ from langchain_core.runnables import RunnableConfig
 
 from coach.core.context import CoachContext
 from coach.core.graph import CoachGraph
-from coach.core.models import AgentRun, Trigger
+from coach.core.models import AgentRun, Athlete, Trigger
 from coach.core.registry import Registry
 from coach.core.repo import record_agent_run
 
@@ -93,3 +93,9 @@ def _tool_calls(messages: list[BaseMessage], registry: Registry) -> list[dict[st
                 }
             )
     return calls
+
+
+async def note_in_thread(graph: CoachGraph, athlete: Athlete, text: str) -> None:
+    """Add an assistant note to the athlete's thread, e.g. that a log was undone."""
+    config: RunnableConfig = {"configurable": {"thread_id": str(athlete.id)}}
+    await graph.aupdate_state(config, {"messages": [AIMessage(content=text)]}, as_node="agent")

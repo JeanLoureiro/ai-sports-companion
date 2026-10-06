@@ -1,11 +1,15 @@
 """A minimal Telegram Bot API client and the update shapes the handler needs."""
 
+from collections.abc import Sequence
 from typing import Any
 
 import httpx
 from pydantic import BaseModel
 
+from coach.core.models import ReplyButton
+
 TELEGRAM_TEXT_LIMIT = 4096
+ALLOWED_UPDATES = ["message", "callback_query"]
 
 
 class Chat(BaseModel):
@@ -22,11 +26,20 @@ class Message(BaseModel):
     text: str | None = None
 
 
+class CallbackQuery(BaseModel):
+    """A tap on an inline button."""
+
+    id: str
+    data: str | None = None
+    message: Message | None = None
+
+
 class Update(BaseModel):
-    """An incoming update; ``message`` is None for every other update type."""
+    """An incoming update; unknown update types leave both fields None."""
 
     update_id: int
     message: Message | None = None
+    callback_query: CallbackQuery | None = None
 
 
 class TelegramError(RuntimeError):
@@ -49,10 +62,24 @@ class TelegramClient:
             raise TelegramError(f"{method} failed: {description}")
         return data["result"]
 
-    async def send_message(self, chat_id: int, text: str) -> None:
-        """Send text, split into several messages when it exceeds Telegram's limit."""
-        for chunk in split_message(text):
-            await self.call("sendMessage", {"chat_id": chat_id, "text": chunk})
+    async def send_message(
+        self, chat_id: int, text: str, buttons: Sequence[ReplyButton] = ()
+    ) -> None:
+        """Send text split at Telegram's limit; buttons go under the last chunk."""
+        chunks = split_message(text)
+        for number, chunk in enumerate(chunks, start=1):
+            payload: dict[str, Any] = {"chat_id": chat_id, "text": chunk}
+            if buttons and number == len(chunks):
+                payload["reply_markup"] = {
+                    "inline_keyboard": [
+                        [{"text": b.text, "callback_data": b.data}] for b in buttons
+                    ]
+                }
+            await self.call("sendMessage", payload)
+
+    async def answer_callback(self, callback_id: str, text: str) -> None:
+        """Acknowledge a button tap with a short toast."""
+        await self.call("answerCallbackQuery", {"callback_query_id": callback_id, "text": text})
 
     async def send_typing(self, chat_id: int) -> None:
         """Show "typing..." while the agent works."""
@@ -62,7 +89,7 @@ class TelegramClient:
         self, offset: int | None, *, poll_seconds: int = 30
     ) -> list[dict[str, Any]]:
         """Long-poll for new message updates, waiting up to ``poll_seconds`` on Telegram's side."""
-        payload: dict[str, Any] = {"timeout": poll_seconds, "allowed_updates": ["message"]}
+        payload: dict[str, Any] = {"timeout": poll_seconds, "allowed_updates": ALLOWED_UPDATES}
         if offset is not None:
             payload["offset"] = offset
         return list(await self.call("getUpdates", payload))
@@ -74,7 +101,7 @@ class TelegramClient:
             {
                 "url": url,
                 "secret_token": secret,
-                "allowed_updates": ["message"],
+                "allowed_updates": ALLOWED_UPDATES,
                 # One athlete, one thread: concurrent turns would overwrite each other's memory.
                 "max_connections": 1,
             },
