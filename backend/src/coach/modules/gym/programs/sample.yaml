@@ -1,0 +1,30 @@
+# A made-up sample program for tests, CI and the demo athlete. Not anyone's real program.
+name: Sample dumbbell program
+sessions_per_week_target: 2
+sessions:
+  - week: 1
+    day: A
+    exercises:
+      - {exercise: Volta ao mundo, block: prep, sets: 2, reps: "8"}
+      - {exercise: Pallof press, block: prep, sets: 3, reps: "12"}
+      - {exercise: Agachamento goblet, block: main, sets: 3, reps: "10", rest_s: 90, tempo: 3.0.1.0}
+      - {exercise: Remada curvada, block: main, sets: 3, reps: "10", rest_s: 90, tempo: 3.0.1.0}
+  - week: 1
+    day: B
+    exercises:
+      - {exercise: Cócoras, block: prep, sets: 1, reps: 60s}
+      - {exercise: Agachamento terra sumo, block: main, sets: 3, reps: 8-10, rest_s: 90, tempo: 3.0.1.0}
+      - {exercise: Serrote, block: main, sets: 3, reps: "10", rest_s: 90, tempo: 3.0.1.0, notes: each side}
+  - week: 2
+    day: A
+    exercises:
+      - {exercise: Volta ao mundo, block: prep, sets: 2, reps: "8"}
+      - {exercise: Pallof press, block: prep, sets: 3, reps: "12"}
+      - {exercise: Agachamento goblet, block: main, sets: 3, reps: "10", rest_s: 90, tempo: 4.0.X.0}
+      - {exercise: Remada curvada, block: main, sets: 3, reps: "10", rest_s: 90, tempo: 4.0.X.0}
+  - week: 2
+    day: B
+    exercises:
+      - {exercise: Cócoras, block: prep, sets: 1, reps: 60s}
+      - {exercise: Agachamento terra sumo, block: main, sets: 3, reps: 8-10, rest_s: 90, tempo: 4.0.X.0}
+      - {exercise: Serrote, block: main, sets: 3, reps: "10", rest_s: 90, tempo: 4.0.X.0, notes: each side}

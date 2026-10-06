@@ -1,0 +1,28 @@
+# Public exercise library. Names are the coach's Portuguese names; aliases add English.
+# pattern: push pull hinge squat lunge carry core mobility stability plyometric
+exercises:
+  - {name: Volta ao mundo, aliases: [around the world, hip circles], pattern: mobility, load_areas: [hips]}
+  - {name: Melhor do mundo, aliases: [worlds greatest stretch, world's greatest stretch], pattern: mobility, load_areas: [hips, upper back]}
+  - {name: Psoas, aliases: [psoas stretch, hip flexor stretch], pattern: mobility, load_areas: [hips]}
+  - {name: Psoas com mobilidade, aliases: [psoas mobility, dynamic hip flexor stretch], pattern: mobility, load_areas: [hips]}
+  - {name: 90/90 com intenção, aliases: [90/90 with intent, 90 90 with intent], pattern: mobility, load_areas: [hips]}
+  - {name: Mobilidade de quadril 90/90, aliases: [90/90 hip mobility, 90/90 hip switch], pattern: mobility, load_areas: [hips]}
+  - {name: Cócoras, aliases: [deep squat hold, squat hold], pattern: mobility, load_areas: [hips, ankles]}
+  - {name: Estabilidade de joelho - ISO, aliases: [knee stability iso, knee isometric], pattern: stability, load_areas: [knees]}
+  - {name: Pallof press, aliases: [pallof], pattern: core, equipment: [band], load_areas: [core]}
+  - {name: SL squat - estabilidade, aliases: [single leg squat stability, single leg squat], pattern: stability, load_areas: [knees, hips]}
+  - {name: Prancha tocando ombros, aliases: [plank shoulder taps, shoulder taps], pattern: core, load_areas: [core, shoulders]}
+  - {name: Copenhagen plank, aliases: [copenhagen], pattern: core, load_areas: [hips, core]}
+  - {name: Aterrisagem solo, aliases: [landing drill, single leg landing, landings], pattern: plyometric, load_areas: [knees, ankles]}
+  - {name: Suitcase carry, aliases: [suitcase walk], pattern: carry, equipment: [dumbbell], load_areas: [core]}
+  - {name: Agachamento goblet, aliases: [goblet squat, goblet], pattern: squat, equipment: [dumbbell], load_areas: [knees, hips]}
+  - {name: Remada curvada, aliases: [bent over row, bent over dumbbell row, dumbbell row], pattern: pull, equipment: [dumbbell], load_areas: [upper back, lower back]}
+  - {name: Supino reto com halter, aliases: [dumbbell bench press, bench press, flat dumbbell press, bench], pattern: push, equipment: [dumbbell, bench], load_areas: [shoulders]}
+  - {name: Afundo, aliases: [lunge, lunges, split squat], pattern: lunge, equipment: [dumbbell], load_areas: [knees, hips]}
+  - {name: Agachamento terra sumo, aliases: [sumo deadlift, sumo squat, sumo], pattern: hinge, equipment: [dumbbell], load_areas: [hips, lower back]}
+  - {name: Serrote, aliases: [one arm dumbbell row, single arm row, one arm row], pattern: pull, equipment: [dumbbell, bench], load_areas: [upper back]}
+  - {name: Barra fixa, aliases: [pull up, pull ups, pullup, pullups, chin up], pattern: pull, equipment: [pull-up bar], load_areas: [shoulders, elbows]}
+  - {name: Stiff unilateral, aliases: [single leg rdl, single leg romanian deadlift, single leg stiff], pattern: hinge, equipment: [dumbbell], load_areas: [hips, lower back]}
+  - {name: Supino ponte com halter, aliases: [glute bridge dumbbell press, bridge press, floor press bridge], pattern: push, equipment: [dumbbell], load_areas: [shoulders]}
+  - {name: Side lunge, aliases: [lateral lunge, afundo lateral], pattern: lunge, equipment: [dumbbell], load_areas: [knees, hips]}
+  - {name: Military press semi ajoelhado, aliases: [half kneeling press, half kneeling military press, military press, overhead press], pattern: push, equipment: [dumbbell], load_areas: [shoulders]}
