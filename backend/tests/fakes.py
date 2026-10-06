@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import anthropic
+import httpx2
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models import LanguageModelInput
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
@@ -81,3 +83,18 @@ def scripted(*replies: AIMessage | str) -> FakeChatModel:
     return FakeChatModel(
         messages=iter([r if isinstance(r, AIMessage) else AIMessage(content=r) for r in replies])
     )
+
+
+class ExplodingChatModel(FakeChatModel):
+    """A model whose API is down."""
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        raise anthropic.APIConnectionError(
+            request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+        )
