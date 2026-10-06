@@ -47,4 +47,4 @@ class GymModule:
         return []
 
     def evals(self) -> list[Path]:
-        return []
+        return [HERE / "evals" / "extraction.yaml"]

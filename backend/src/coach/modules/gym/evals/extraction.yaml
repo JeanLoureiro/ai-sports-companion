@@ -1,0 +1,49 @@
+# Synthetic gym logging messages. expected: the log_gym_session arguments that must be
+# extracted (exercise names as in the library); null means the tool must not be called.
+tool: log_gym_session
+cases:
+  - id: gym-01
+    input: did treino A today, goblet 22kg, rpe 7
+    expected: {day: A, rpe: 7, lifts: [{exercise: Agachamento goblet, load_kg: 22}]}
+  - id: gym-02
+    input: Finished Treino B. Sumo 24 kg, serrote 18kg. Felt like an 8.
+    expected: {day: B, rpe: 8, lifts: [{exercise: Agachamento terra sumo, load_kg: 24}, {exercise: Serrote, load_kg: 18}]}
+  - id: gym-03
+    input: gym done, everything as planned
+    expected: {}
+  - id: gym-04
+    input: Did C but skipped the side lunges, knee was cranky
+    expected: {day: C, lifts: [{exercise: Side lunge, skipped: true}]}
+  - id: gym-05
+    input: Treino A, swapped the bench press for push ups, rows with 20kg
+    expected: {day: A, lifts: [{exercise: Supino reto com halter, swapped_to: push ups}, {exercise: Remada curvada, load_kg: 20}]}
+  - id: gym-06
+    input: 45 minute gym session, rpe 6
+    expected: {duration_min: 45, rpe: 6}
+  - id: gym-07
+    input: B this morning, 50 minutes, rpe 7, sumo deadlift 26kg
+    expected: {day: B, duration_min: 50, rpe: 7, lifts: [{exercise: Agachamento terra sumo, load_kg: 26}]}
+  - id: gym-08
+    input: "Treino C: stiff 16kg cada perna, supino ponte 20, military press 12kg"
+    expected: {day: C, lifts: [{exercise: Stiff unilateral, load_kg: 16}, {exercise: Supino ponte com halter, load_kg: 20}, {exercise: Military press semi ajoelhado, load_kg: 12}]}
+  - id: gym-09
+    input: Did treino A. Goblet 24, remada 22, supino 20, afundo 12s. RPE 9
+    expected: {day: A, rpe: 9, lifts: [{exercise: Agachamento goblet, load_kg: 24}, {exercise: Remada curvada, load_kg: 22}, {exercise: Supino reto com halter, load_kg: 20}, {exercise: Afundo, load_kg: 12}]}
+  - id: gym-10
+    input: pull ups went up to 10 reps today on B
+    expected: {day: B, lifts: [{exercise: Barra fixa, reps: "10"}]}
+  - id: gym-11
+    input: skipped the copenhagen plank, rest as written, treino b
+    expected: {day: B, lifts: [{exercise: Copenhagen plank, skipped: true}]}
+  - id: gym-12
+    input: Session A done in 55 minutes
+    expected: {day: A, duration_min: 55}
+  - id: gym-13
+    input: "Today's gym: goblet squat only 3 sets instead of 4, 20kg"
+    expected: {lifts: [{exercise: Agachamento goblet, sets: 3, load_kg: 20}]}
+  - id: gym-14
+    input: treino C feito, rpe 6
+    expected: {day: C, rpe: 6}
+  - id: gym-15
+    input: how many gym sessions have I done this week?
+    expected: null

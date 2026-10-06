@@ -1,0 +1,208 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "cases": {
+    "gym-01": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "lifts": [
+            {
+              "exercise": "Agachamento goblet",
+              "load_kg": 22,
+              "rpe": 7
+            }
+          ]
+        }
+      }
+    ],
+    "gym-02": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "lifts": [
+            {
+              "exercise": "Agachamento terra sumo",
+              "load_kg": 24
+            },
+            {
+              "exercise": "Serrote",
+              "load_kg": 18
+            }
+          ],
+          "rpe": 8
+        }
+      }
+    ],
+    "gym-03": [
+      {
+        "name": "log_gym_session",
+        "args": {}
+      }
+    ],
+    "gym-04": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "lifts": [
+            {
+              "exercise": "Side lunge",
+              "skipped": true
+            }
+          ]
+        }
+      }
+    ],
+    "gym-05": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "day": "A",
+          "lifts": [
+            {
+              "exercise": "Supino reto com halter",
+              "swapped_to": "push ups"
+            },
+            {
+              "exercise": "Serrote",
+              "load_kg": 20
+            }
+          ]
+        }
+      }
+    ],
+    "gym-06": [
+      {
+        "name": "get_program",
+        "args": {}
+      }
+    ],
+    "gym-07": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "day": "B",
+          "duration_min": 50,
+          "rpe": 7,
+          "lifts": [
+            {
+              "exercise": "Agachamento terra sumo",
+              "load_kg": 26
+            }
+          ]
+        }
+      }
+    ],
+    "gym-08": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "lifts": [
+            {
+              "exercise": "Stiff unilateral",
+              "load_kg": 16
+            },
+            {
+              "exercise": "Supino ponte com halter",
+              "load_kg": 20
+            },
+            {
+              "exercise": "Military press semi ajoelhado",
+              "load_kg": 12
+            }
+          ]
+        }
+      }
+    ],
+    "gym-09": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "day": "A",
+          "lifts": [
+            {
+              "exercise": "Agachamento goblet",
+              "load_kg": 24
+            },
+            {
+              "exercise": "Remada curvada",
+              "load_kg": 22
+            },
+            {
+              "exercise": "Supino reto com halter",
+              "load_kg": 20
+            },
+            {
+              "exercise": "Afundo",
+              "load_kg": 12
+            }
+          ],
+          "rpe": 9
+        }
+      }
+    ],
+    "gym-10": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "day": "B",
+          "lifts": [
+            {
+              "exercise": "Barra fixa",
+              "reps": "10"
+            }
+          ]
+        }
+      }
+    ],
+    "gym-11": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "day": "B",
+          "lifts": [
+            {
+              "exercise": "Copenhagen plank",
+              "skipped": true
+            }
+          ]
+        }
+      }
+    ],
+    "gym-12": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "duration_min": 55
+        }
+      }
+    ],
+    "gym-13": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "lifts": [
+            {
+              "exercise": "Agachamento goblet",
+              "sets": 3,
+              "load_kg": 20
+            }
+          ]
+        }
+      }
+    ],
+    "gym-14": [
+      {
+        "name": "log_gym_session",
+        "args": {
+          "rpe": 6
+        }
+      }
+    ],
+    "gym-15": [
+      {
+        "name": "get_program",
+        "args": {}
+      }
+    ]
+  }
+}
