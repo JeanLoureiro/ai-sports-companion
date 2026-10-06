@@ -13,7 +13,7 @@ First time: `bash scripts/provision.sh` walks you through Supabase, both Telegra
 ```bash
 supabase db start                 # local Postgres on 127.0.0.1:54422
 cd backend
-cp .env.example .env              # fill in the Telegram and Anthropic values
+cp .env.example .env              # skip if you ran the wizard; it already wrote .env
 uv sync
 uv run coach migrate
 uv run coach add-athlete --name "Your Name" --chat-id <your Telegram chat id>

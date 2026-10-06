@@ -188,6 +188,7 @@ TOTAL_STAGES=14
 
 cd "$(dirname "$0")/.."
 ENV_FILE="backend/.env"
+LOCAL_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54422/postgres"
 
 # chat_id_from_updates TOKEN prints the chat id of the newest private message to that bot.
 chat_id_from_updates() {
@@ -226,8 +227,10 @@ step "In the project, click Connect (top bar)."
 step "Under Connection String, choose the Transaction pooler entry (port 6543)."
 step "Copy the URI and replace [YOUR-PASSWORD] with the password you saved."
 note "It looks like postgresql://postgres.<ref>:<password>@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres"
-ask_secret COACH_DATABASE_URL "Paste the full URI (hidden):"
-write_env COACH_DATABASE_URL "$COACH_DATABASE_URL"
+note "Saved as PROD_DATABASE_URL; your local .env keeps pointing at the local database."
+ask_secret PROD_DATABASE_URL "Paste the full URI (hidden):"
+write_env PROD_DATABASE_URL "$PROD_DATABASE_URL"
+write_env COACH_DATABASE_URL "$LOCAL_DATABASE_URL"
 
 stage "Telegram: dev bot"
 say "The dev bot is for local long polling; it never gets a webhook."
@@ -284,19 +287,25 @@ step "Set a monthly spend limit of \$10 for this workspace."
 note "If the page differs, look for Limits or Spend limits under Settings."
 pause "Press Enter once the limit is set."
 
-stage "Database: schema and your athlete"
+stage "Database: schema and your athlete, production and local"
 say "Creates every table, the agent's checkpoint tables, and row-level security."
-if ! (cd backend && uv run coach migrate); then
+ask ATHLETE_NAME "Your name, as the coach should call you:"
+say "Production (Supabase):"
+if ! (cd backend && COACH_DATABASE_URL="$PROD_DATABASE_URL" uv run coach migrate); then
   warn "Migration failed. If the error mentions CONCURRENTLY or prepared statements,"
   warn "re-run with the Session pooler URI (port 5432) from the same Connect dialog."
   exit 1
 fi
-ask ATHLETE_NAME "Your name, as the coach should call you:"
+(cd backend && COACH_DATABASE_URL="$PROD_DATABASE_URL" \
+  uv run coach add-athlete --name "$ATHLETE_NAME" --chat-id "$CHAT_ID")
+say "Local (Docker), so local runs never touch your real coach memory:"
+supabase db start
+(cd backend && uv run coach migrate)
 (cd backend && uv run coach add-athlete --name "$ATHLETE_NAME" --chat-id "$CHAT_ID")
 pause
 
 stage "Local check with the dev bot"
-say "Runs the bot on this machine by long polling. Watch for a reply in Telegram."
+say "Runs the bot on this machine against the local database. Watch for a reply in Telegram."
 step "When it says 'Long polling', send the DEV bot: how much did I train this week?"
 step "Expect a short reply saying nothing is logged yet. Then press Ctrl-C here."
 pause "Press Enter to start polling."
@@ -315,8 +324,8 @@ step "When asked for the code directory, keep ./ (you are already in backend/)."
 pause
 
 stage "Vercel: production environment variables"
-say "Same values as your .env, except the PRODUCTION bot token."
-vercel_env COACH_DATABASE_URL "$COACH_DATABASE_URL"
+say "Production values: the Supabase database and the PRODUCTION bot token."
+vercel_env COACH_DATABASE_URL "$PROD_DATABASE_URL"
 vercel_env COACH_TELEGRAM_BOT_TOKEN "$PROD_TELEGRAM_BOT_TOKEN"
 vercel_env COACH_TELEGRAM_WEBHOOK_SECRET "$COACH_TELEGRAM_WEBHOOK_SECRET"
 vercel_env COACH_TELEGRAM_ALLOWED_CHAT_IDS "[$CHAT_ID]"
@@ -349,7 +358,7 @@ stage "End-to-end check"
 step "Send the PRODUCTION bot: how much did I train this week?"
 pause "Press Enter after it replies."
 say "Latest agent turn (error should be empty):"
-psql "$COACH_DATABASE_URL" -c "select trigger, model, input_tokens, output_tokens, latency_ms, error from agent_runs order by created_at desc limit 1" \
+psql "$PROD_DATABASE_URL" -c "select trigger, model, input_tokens, output_tokens, latency_ms, error from agent_runs order by created_at desc limit 1" \
   || warn "psql could not connect; check the turn in the Supabase table editor instead."
 step "Optional: from another Telegram account, message the production bot. It must not reply."
 pause
