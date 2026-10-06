@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from coach.core.config import Settings
 
 ENV = {
-    "COACH_DATABASE_URL": "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    "COACH_DATABASE_URL": "postgresql://postgres:postgres@127.0.0.1:54422/postgres",
     "COACH_TELEGRAM_BOT_TOKEN": "123:abc",
     "COACH_TELEGRAM_WEBHOOK_SECRET": "s3cret-hook",
     "COACH_TELEGRAM_ALLOWED_CHAT_IDS": "[111, 222]",

@@ -9,7 +9,7 @@ How the system fits together is in [ARCHITECTURE.md](ARCHITECTURE.md).
 Requirements: uv, Docker, the Supabase CLI.
 
 ```bash
-supabase db start                 # local Postgres on 127.0.0.1:54322
+supabase db start                 # local Postgres on 127.0.0.1:54422
 cd backend
 cp .env.example .env              # fill in the Telegram and Anthropic values
 uv sync
