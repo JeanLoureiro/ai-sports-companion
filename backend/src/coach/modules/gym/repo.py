@@ -82,9 +82,20 @@ async def insert_details(
     session_id: UUID,
     program_session_id: UUID | None,
     lifts: list[dict[str, Any]],
+    notes: str | None = None,
 ) -> None:
     """The gym part of a logged session."""
     await conn.execute(
-        "insert into gym_details (session_id, program_session_id, lifts) values (%s, %s, %s)",
-        (session_id, program_session_id, Jsonb(lifts)),
+        "insert into gym_details (session_id, program_session_id, lifts, notes) "
+        "values (%s, %s, %s, %s)",
+        (session_id, program_session_id, Jsonb(lifts), notes),
     )
+
+
+async def day_labels(conn: Connection, program_id: UUID) -> list[str]:
+    """The day labels a program uses, e.g. ['A', 'B', 'C']."""
+    cur = await conn.execute(
+        "select distinct day_label from program_sessions where program_id = %s order by 1",
+        (program_id,),
+    )
+    return [row["day_label"] for row in await cur.fetchall()]

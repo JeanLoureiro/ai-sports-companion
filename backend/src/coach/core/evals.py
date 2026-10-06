@@ -12,6 +12,7 @@ import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -19,6 +20,7 @@ from uuid import UUID
 import yaml
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.utils.function_calling import convert_to_openai_tool
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel
 
@@ -34,6 +36,40 @@ EVAL_ATHLETE = Athlete(
 )
 EVAL_NOW = datetime(2026, 10, 6, 9, 0, tzinfo=UTC)
 IGNORED_FIELDS = {"started_at", "notes"}
+MIN_TOOL_ACCURACY = 0.8
+MIN_RECALL = 0.8
+
+
+class StaleRecordingError(Exception):
+    """A recording was made with a different system prompt or tool schema."""
+
+
+def fingerprint(registry: Registry) -> str:
+    """A short hash of everything the model sees: system prompt and every tool schema."""
+    payload = {
+        "system": system_prompt(EVAL_ATHLETE, registry, "", EVAL_NOW),
+        "tools": [convert_to_openai_tool(t) for t in [*CORE_TOOLS, *registry.tools()]],
+    }
+    encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()
+    return sha256(encoded).hexdigest()[:16]
+
+
+def check_recording(recording: dict[str, Any], current: str) -> None:
+    """Refuse to score answers the current prompt and tools would not have produced."""
+    if recording.get("fingerprint") != current:
+        raise StaleRecordingError(
+            "the recording was made with a different prompt or tool schema; "
+            "re-record with --mode live --record"
+        )
+
+
+def below_thresholds(summary: dict[str, Any]) -> list[str]:
+    """Scores under the bar, as readable lines; empty when the set passes."""
+    failures = []
+    for key, minimum in (("tool_accuracy", MIN_TOOL_ACCURACY), ("recall", MIN_RECALL)):
+        if summary[key] < minimum:
+            failures.append(f"{key} {summary[key]:.2f} < {minimum:.2f}")
+    return failures
 
 
 class EvalCase(BaseModel):
@@ -157,7 +193,9 @@ async def _run(args: argparse.Namespace) -> None:
     from coach.modules.gym.library import normalize  # the only normalizer so far
 
     registry = default_registry()
+    current = fingerprint(registry)
     results: dict[str, dict[str, Any]] = {}
+    failures: list[str] = []
     for module in registry.modules:
         for path in module.evals():
             eval_set = load_set(path)
@@ -169,7 +207,11 @@ async def _run(args: argparse.Namespace) -> None:
                     recording.parent.mkdir(parents=True, exist_ok=True)
                     recording.write_text(
                         json.dumps(
-                            {"model": settings.agent_model, "cases": predictions},
+                            {
+                                "model": settings.agent_model,
+                                "fingerprint": current,
+                                "cases": predictions,
+                            },
                             indent=2,
                             ensure_ascii=False,
                         )
@@ -181,13 +223,19 @@ async def _run(args: argparse.Namespace) -> None:
                     raise SystemExit(
                         f"No recording for {eval_set.name}; run with --mode live --record"
                     )
-                predictions = json.loads(recording.read_text(encoding="utf-8"))["cases"]
+                recorded = json.loads(recording.read_text(encoding="utf-8"))
+                try:
+                    check_recording(recorded, current)
+                except StaleRecordingError as err:
+                    raise SystemExit(f"{eval_set.name}: {err}") from err
+                predictions = recorded["cases"]
             scores = [
                 score_case(c, eval_set.tool, predictions.get(c.id, []), normalize)
                 for c in eval_set.cases
             ]
             results[eval_set.name] = summarize(scores)
             print(f"{module.name}/{eval_set.name}: {json.dumps(results[eval_set.name])}")
+            failures += [f"{eval_set.name}: {f}" for f in below_thresholds(results[eval_set.name])]
             for s in scores:
                 if not s.tool_ok or s.recall < 1 or s.hallucinated:
                     print(
@@ -211,6 +259,8 @@ async def _run(args: argparse.Namespace) -> None:
                 )
         finally:
             await pool.close()
+    if failures:
+        raise SystemExit("Evals below the bar:\n" + "\n".join(failures))
 
 
 def main(argv: Sequence[str] | None = None) -> None:

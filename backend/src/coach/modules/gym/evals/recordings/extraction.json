@@ -1,5 +1,6 @@
 {
   "model": "claude-haiku-4-5-20251001",
+  "fingerprint": "bdc8eda36f2c2970",
   "cases": {
     "gym-01": [
       {
@@ -38,7 +39,9 @@
     "gym-03": [
       {
         "name": "log_gym_session",
-        "args": {}
+        "args": {
+          "day": null
+        }
       }
     ],
     "gym-04": [
@@ -73,7 +76,12 @@
         }
       }
     ],
-    "gym-06": [],
+    "gym-06": [
+      {
+        "name": "get_program",
+        "args": {}
+      }
+    ],
     "gym-07": [
       {
         "name": "log_gym_session",
@@ -139,20 +147,7 @@
         }
       }
     ],
-    "gym-10": [
-      {
-        "name": "log_gym_session",
-        "args": {
-          "day": "B",
-          "lifts": [
-            {
-              "exercise": "Barra fixa",
-              "reps": "10"
-            }
-          ]
-        }
-      }
-    ],
+    "gym-10": [],
     "gym-11": [
       {
         "name": "log_gym_session",
@@ -171,6 +166,7 @@
       {
         "name": "log_gym_session",
         "args": {
+          "day": null,
           "duration_min": 55
         }
       }
@@ -179,6 +175,7 @@
       {
         "name": "log_gym_session",
         "args": {
+          "day": null,
           "lifts": [
             {
               "exercise": "Agachamento goblet",
@@ -200,8 +197,11 @@
     ],
     "gym-15": [
       {
-        "name": "get_program",
-        "args": {}
+        "name": "query_history",
+        "args": {
+          "kind": "recent_sessions",
+          "period": "this_week"
+        }
       }
     ]
   }

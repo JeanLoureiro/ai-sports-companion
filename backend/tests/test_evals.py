@@ -92,3 +92,25 @@ def test_summary_averages_cases() -> None:
         "recall": 0.5,
         "hallucinated": 0,
     }
+
+
+def test_a_recording_from_a_different_prompt_or_schema_is_stale() -> None:
+    from coach.core.evals import StaleRecordingError, check_recording, fingerprint
+
+    current = fingerprint(Registry([GymModule()]))
+
+    check_recording({"fingerprint": current}, current)
+    with pytest.raises(StaleRecordingError):
+        check_recording({"fingerprint": "something-older"}, current)
+    with pytest.raises(StaleRecordingError):
+        check_recording({}, current)
+
+
+def test_scores_below_the_bar_fail() -> None:
+    from coach.core.evals import below_thresholds
+
+    assert below_thresholds({"tool_accuracy": 0.9, "recall": 0.85}) == []
+    assert below_thresholds({"tool_accuracy": 0.7, "recall": 0.6}) == [
+        "tool_accuracy 0.70 < 0.80",
+        "recall 0.60 < 0.80",
+    ]

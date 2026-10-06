@@ -1,7 +1,6 @@
 """Gym tools bound to the agent."""
 
 import json
-import re
 from datetime import UTC, datetime
 from typing import Annotated, Any
 from zoneinfo import ZoneInfo
@@ -19,6 +18,7 @@ from coach.modules.gym.library import ExerciseIndex, library_index, normalize
 from coach.modules.gym.repo import (
     active_program,
     complete_program_session,
+    day_labels,
     done_since,
     insert_details,
     next_pending,
@@ -89,11 +89,11 @@ def merge_lifts(
 
     Prep exercises are stored only when mentioned; unknown exercises are kept as said.
     """
+    planned_names = [p["exercise"] for p in planned]
     mentioned: dict[str, tuple[str, LiftLog, bool]] = {}
     for lift in lifts:
-        known = index.resolve(lift.exercise)
-        name = known.name if known else lift.exercise
-        mentioned[normalize(name)] = (name, lift, known is not None)
+        name, known = _resolve(lift.exercise, planned_names, index)
+        mentioned[normalize(name)] = (name, lift, known)
     entries: list[dict[str, Any]] = []
     for p in planned:
         said = mentioned.pop(normalize(p["exercise"]), None)
@@ -126,11 +126,36 @@ def _said(lift: LiftLog, index: ExerciseIndex) -> dict[str, Any]:
     return out
 
 
-def _day_label(day: str | None) -> str | None:
-    if not day:
-        return None
-    match = re.search(r"([a-z])\s*$", normalize(day))
-    return match.group(1).upper() if match else None
+def _tokens(text: str) -> set[str]:
+    return {w.removesuffix("s") if len(w) > 3 else w for w in normalize(text).split()}
+
+
+def _resolve(name: str, planned: list[str], index: ExerciseIndex) -> tuple[str, bool]:
+    """Prefer the session being logged ("rows" on Treino B is its row), then the library.
+
+    A planned exercise matches when every word said appears in its name or one alias, and
+    only a unique match counts; otherwise the library decides, and unknown names stay as said.
+    """
+    said = _tokens(name)
+    matches = []
+    for planned_name in planned:
+        exercise = index.resolve(planned_name)
+        keys = [planned_name, *(exercise.aliases if exercise else ())]
+        if said and any(said <= _tokens(key) for key in keys):
+            matches.append(planned_name)
+    if len(matches) == 1:
+        return matches[0], True
+    known = index.resolve(name)
+    return (known.name, True) if known else (name, False)
+
+
+_DAY_WORDS = {"treino", "session", "sessao", "day", "dia", "workout"}
+
+
+def _day_label(day: str) -> str | None:
+    """'Treino B', 'b', 'session C' -> 'B', 'C'; anything else -> None."""
+    words = [w for w in normalize(day).split() if w not in _DAY_WORDS]
+    return words[0].upper() if len(words) == 1 and len(words[0]) == 1 else None
 
 
 def _started_at(value: datetime | None, ctx: CoachContext) -> datetime:
@@ -147,10 +172,11 @@ async def log_gym_session(
     day: Annotated[
         str | None,
         Field(
-            description="Always pass this when the athlete names the session "
-            "('Treino B', 'B', 'session C'): A, B or C. Omit only if they did not name it."
+            description="Required. The session the athlete named ('Treino B', 'B', "
+            "'session C' -> A, B or C), or null only if they did not name one. Always pass "
+            "it when named: without it the next pending session is completed."
         ),
-    ] = None,
+    ],
     started_at: Annotated[
         datetime | None, Field(description="Local date and time; omit for now")
     ] = None,
@@ -164,11 +190,18 @@ async def log_gym_session(
     pending session for that day. Call once per session."""
     ctx = runtime.context
     index = library_index()
-    label_day = _day_label(day)
+    label_day = _day_label(day) if day else None
     async with ctx.pool.connection() as conn, conn.transaction():
         program = await active_program(conn, ctx.athlete)
         planned = None
         if program is not None:
+            if day:
+                labels = await day_labels(conn, program["id"])
+                if label_day not in labels:
+                    raise ValueError(
+                        f"Unknown day {day!r}: this program's days are {', '.join(labels)}. "
+                        "Ask the athlete which session they did."
+                    )
             planned = await next_pending(conn, program["id"], day_label=label_day)
         planned_rows = await prescriptions(conn, planned["id"]) if planned else []
         entries = merge_lifts(planned_rows, lifts or [], index)
@@ -182,7 +215,7 @@ async def log_gym_session(
             rpe=rpe,
             summary=label,
         )
-        await insert_details(conn, session_id, planned["id"] if planned else None, entries)
+        await insert_details(conn, session_id, planned["id"] if planned else None, entries, notes)
         if planned is not None:
             await complete_program_session(conn, planned["id"], session_id)
         total = (await progress(conn, program["id"]))["total"] if program else 0

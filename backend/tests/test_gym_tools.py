@@ -143,7 +143,11 @@ async def test_logs_the_next_session_with_the_loads_mentioned(pool: Pool, athlet
                 {
                     "name": "log_gym_session",
                     "id": "l1",
-                    "args": {"rpe": 7, "lifts": [{"exercise": "goblet squat", "load_kg": 22}]},
+                    "args": {
+                        "day": None,
+                        "rpe": 7,
+                        "lifts": [{"exercise": "goblet squat", "load_kg": 22}],
+                    },
                 }
             ],
         ),
@@ -202,11 +206,12 @@ async def test_swaps_skips_and_unknown_exercises_are_kept(pool: Pool, athlete: A
         pool,
         "log_gym_session",
         {
+            "day": None,
             "lifts": [
                 {"exercise": "Remada curvada", "swapped_to": "push ups"},
                 {"exercise": "goblet", "skipped": True},
                 {"exercise": "bulgarian bag spin", "sets": 2},
-            ]
+            ],
         },
     )
 
@@ -228,7 +233,9 @@ async def test_a_time_without_a_zone_is_the_athletes_local_time(
 ) -> None:
     await seeded(pool, athlete)
 
-    await call_tool(athlete, pool, "log_gym_session", {"started_at": "2026-10-06T07:00:00"})
+    await call_tool(
+        athlete, pool, "log_gym_session", {"day": None, "started_at": "2026-10-06T07:00:00"}
+    )
 
     [row] = await gym_rows(pool, athlete)
     assert row["started_at"] == datetime(2026, 10, 5, 21, 0, tzinfo=UTC)
@@ -236,7 +243,7 @@ async def test_a_time_without_a_zone_is_the_athletes_local_time(
 
 async def test_undo_frees_the_program_slot(pool: Pool, athlete: Athlete) -> None:
     await seeded(pool, athlete)
-    await call_tool(athlete, pool, "log_gym_session", {})
+    await call_tool(athlete, pool, "log_gym_session", {"day": None})
     [row] = await gym_rows(pool, athlete)
 
     async with pool.connection() as conn:
@@ -260,7 +267,10 @@ async def test_a_field_the_tool_does_not_know_is_an_error_not_a_silent_drop(
                 {
                     "name": "log_gym_session",
                     "id": "x1",
-                    "args": {"lifts": [{"exercise": "goblet", "load_kg": 22, "rpe": 7}]},
+                    "args": {
+                        "day": None,
+                        "lifts": [{"exercise": "goblet", "load_kg": 22, "rpe": 7}],
+                    },
                 }
             ],
         ),
@@ -282,3 +292,62 @@ def test_the_tool_tells_the_model_to_pass_the_named_day() -> None:
     schema = log_gym_session.args
     assert "always" in schema["day"]["description"].lower()
     assert "Treino B" in GymModule().prompt(Athlete(UUID(int=1), "J", "Australia/Brisbane", 1))
+
+
+def test_day_is_required_so_the_model_decides_on_purpose() -> None:
+    from langchain_core.utils.function_calling import convert_to_openai_tool
+
+    from coach.modules.gym.tools import log_gym_session
+
+    parameters = convert_to_openai_tool(log_gym_session)["function"]["parameters"]
+    assert "day" in parameters["required"]
+
+
+async def test_a_day_the_program_does_not_have_is_an_error(pool: Pool, athlete: Athlete) -> None:
+    await seeded(pool, athlete)
+
+    result = await call_tool(athlete, pool, "log_gym_session", {"day": "Wednesday"})
+
+    assert "A, B" in result
+    assert await gym_rows(pool, athlete) == []
+
+
+@pytest.mark.parametrize(
+    ("said", "planned_day", "expected"),
+    [
+        ("rows", "A", "Remada curvada"),
+        ("remada", "A", "Remada curvada"),
+        ("rows", "B", "Serrote"),
+        ("sumo", "B", "Agachamento terra sumo"),
+    ],
+)
+async def test_short_names_resolve_within_the_session_being_logged(
+    pool: Pool, athlete: Athlete, said: str, planned_day: str, expected: str
+) -> None:
+    await seeded(pool, athlete)
+
+    await call_tool(
+        athlete,
+        pool,
+        "log_gym_session",
+        {"day": planned_day, "lifts": [{"exercise": said, "load_kg": 20}]},
+    )
+
+    [row] = await gym_rows(pool, athlete)
+    lifts = {lift["exercise"]: lift for lift in row["lifts"]}
+    assert lifts[expected]["load_kg"] == 20
+    assert not any(lift.get("extra") for lift in row["lifts"])
+
+
+async def test_notes_are_kept_with_the_session(pool: Pool, athlete: Athlete) -> None:
+    await seeded(pool, athlete)
+
+    await call_tool(athlete, pool, "log_gym_session", {"day": None, "notes": "knee was cranky"})
+
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "select gd.notes from gym_details gd join sessions s on s.id = gd.session_id "
+            "where s.athlete_id = %s",
+            (athlete.id,),
+        )
+        assert await cur.fetchone() == {"notes": "knee was cranky"}
