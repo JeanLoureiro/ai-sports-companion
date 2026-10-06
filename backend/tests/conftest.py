@@ -6,6 +6,9 @@ from psycopg_pool import PoolTimeout
 
 from coach.core.db import Connection, Pool, create_pool
 from coach.core.migrations import CORE_MIGRATIONS, migrate_all
+from coach.core.models import Athlete
+from coach.core.repo import create_athlete
+from tests.factories import new_chat_id
 
 TEST_DATABASE_URL = os.environ.get(
     "COACH_TEST_DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54422/postgres"
@@ -42,3 +45,9 @@ async def pool() -> AsyncIterator[Pool]:
 async def conn(pool: Pool) -> AsyncIterator[Connection]:
     async with pool.connection() as connection, connection.transaction(force_rollback=True):
         yield connection
+
+
+@pytest.fixture
+async def athlete(pool: Pool) -> Athlete:
+    async with pool.connection() as connection:
+        return await create_athlete(connection, name="Test Athlete", telegram_chat_id=new_chat_id())
