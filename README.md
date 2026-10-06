@@ -8,6 +8,8 @@ How the system fits together is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Requirements: uv, Docker, the Supabase CLI.
 
+First time: `bash scripts/provision.sh` walks you through Supabase, both Telegram bots, the Anthropic key and the Vercel deploy, writing `backend/.env` as it goes.
+
 ```bash
 supabase db start                 # local Postgres on 127.0.0.1:54422
 cd backend
