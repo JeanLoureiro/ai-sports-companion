@@ -31,3 +31,11 @@ class AgentRun:
     input_tokens: int = 0
     output_tokens: int = 0
     error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ReplyButton:
+    """An inline button under the reply; ``data`` comes back as a callback (max 64 bytes)."""
+
+    text: str
+    data: str

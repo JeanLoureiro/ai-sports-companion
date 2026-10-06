@@ -17,13 +17,15 @@ from langchain_core.outputs import ChatResult
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool, tool
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.prebuilt import ToolRuntime
 from pydantic import Field
 
 from coach.core.config import Settings
+from coach.core.context import CoachContext
 from coach.core.db import Connection, Pool
 from coach.core.deps import Deps
 from coach.core.graph import build_graph
-from coach.core.models import Athlete
+from coach.core.models import Athlete, ReplyButton
 from coach.core.registry import Registry, ScheduledJob
 from coach.core.telegram import TelegramClient
 from tests.conftest import TEST_DATABASE_URL
@@ -144,7 +146,12 @@ class TelegramRecorder:
 
 
 def make_deps(
-    pool: Pool, model: FakeChatModel, recorder: TelegramRecorder, *, allowed: list[int]
+    pool: Pool,
+    model: FakeChatModel,
+    recorder: TelegramRecorder,
+    *,
+    allowed: list[int],
+    registry: Registry | None = None,
 ) -> Deps:
     settings = Settings.model_validate(
         {
@@ -156,7 +163,7 @@ def make_deps(
             "agent_model": "test-model",
         }
     )
-    registry = Registry([])
+    registry = registry or Registry([])
     return Deps(
         settings=settings,
         pool=pool,
@@ -186,3 +193,22 @@ class BrokenChatModel(FakeChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         raise RuntimeError("boom")
+
+
+@tool
+async def button_tool(label: str, runtime: ToolRuntime[CoachContext]) -> str:
+    """Attach a button to the reply."""
+    runtime.context.reply_buttons.append(ReplyButton(text=label, data="noop"))
+    return "button attached"
+
+
+def callback_update(update_id: int, chat_id: int, data: str) -> dict[str, Any]:
+    return {
+        "update_id": update_id,
+        "callback_query": {
+            "id": f"cb-{update_id}",
+            "from": {"id": chat_id, "is_bot": False, "first_name": "T"},
+            "data": data,
+            "message": {"message_id": 9, "chat": {"id": chat_id, "type": "private"}},
+        },
+    }

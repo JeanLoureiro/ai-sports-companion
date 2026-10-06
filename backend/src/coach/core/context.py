@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from coach.core.db import Pool
-from coach.core.models import Athlete
+from coach.core.models import Athlete, ReplyButton
 from coach.core.registry import Registry
 
 
@@ -21,3 +21,5 @@ class CoachContext:
     pool: Pool
     registry: Registry
     now: Callable[[], datetime] = field(default=_utcnow)
+    # Tools append; the handler sends them under the reply. Mutable on purpose.
+    reply_buttons: list[ReplyButton] = field(default_factory=list)

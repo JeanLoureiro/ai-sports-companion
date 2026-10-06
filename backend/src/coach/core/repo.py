@@ -134,3 +134,36 @@ async def record_agent_run(conn: Connection, run: AgentRun) -> UUID:
     )
     run_id: UUID = (await _one(cur))["id"]
     return run_id
+
+
+async def create_session(
+    conn: Connection,
+    athlete: Athlete,
+    *,
+    discipline: str,
+    started_at: datetime,
+    duration_min: int | None = None,
+    rpe: int | None = None,
+    summary: str | None = None,
+    input_type: str = "text",
+) -> UUID:
+    """Insert one training session in any discipline."""
+    cur = await conn.execute(
+        "insert into sessions (athlete_id, discipline, started_at, duration_min, rpe, summary, "
+        "input_type) values (%s, %s, %s, %s, %s, %s, %s) returning id",
+        (athlete.id, discipline, started_at, duration_min, rpe, summary, input_type),
+    )
+    session_id: UUID = (await _one(cur))["id"]
+    return session_id
+
+
+async def undo_session(conn: Connection, athlete: Athlete, session_id: UUID) -> str | None:
+    """Delete one of this athlete's sessions; module rows go with it through foreign keys."""
+    cur = await conn.execute(
+        "delete from sessions where id = %s and athlete_id = %s returning summary",
+        (session_id, athlete.id),
+    )
+    row = await cur.fetchone()
+    if row is None:
+        return None
+    return str(row["summary"] or "a session")

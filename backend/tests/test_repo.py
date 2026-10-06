@@ -8,10 +8,12 @@ from coach.core.models import AgentRun, Athlete
 from coach.core.repo import (
     claim_update,
     create_athlete,
+    create_session,
     get_athlete_by_chat_id,
     recent_sessions,
     record_agent_run,
     sessions_per_discipline,
+    undo_session,
     weekly_load,
 )
 from tests.factories import insert_session, new_chat_id, new_update_id
@@ -125,3 +127,18 @@ async def test_history_excludes_sessions_after_until(conn: Connection) -> None:
     )
 
     assert rows == []
+
+
+async def test_create_and_undo_a_session(conn: Connection, athlete: Athlete) -> None:
+    session_id = await create_session(
+        conn,
+        athlete,
+        discipline="testsport",
+        started_at=NOW,
+        duration_min=45,
+        rpe=7,
+        summary="Treino A",
+    )
+
+    assert await undo_session(conn, athlete, session_id) == "Treino A"
+    assert await undo_session(conn, athlete, session_id) is None
