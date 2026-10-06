@@ -1,6 +1,6 @@
 {
   "model": "claude-haiku-4-5-20251001",
-  "fingerprint": "bdc8eda36f2c2970",
+  "fingerprint": "b07cc782da61a74a",
   "cases": {
     "gym-01": [
       {
@@ -10,7 +10,7 @@
           "rpe": 7,
           "lifts": [
             {
-              "exercise": "Agachamento goblet",
+              "exercise": "goblet",
               "load_kg": 22
             }
           ]
@@ -22,7 +22,6 @@
         "name": "log_gym_session",
         "args": {
           "day": "B",
-          "rpe": 8,
           "lifts": [
             {
               "exercise": "Agachamento terra sumo",
@@ -32,7 +31,8 @@
               "exercise": "Serrote",
               "load_kg": 18
             }
-          ]
+          ],
+          "rpe": 8
         }
       }
     ],
@@ -51,7 +51,7 @@
           "day": "C",
           "lifts": [
             {
-              "exercise": "Side lunge",
+              "exercise": "side lunge",
               "skipped": true
             }
           ]
@@ -76,12 +76,7 @@
         }
       }
     ],
-    "gym-06": [
-      {
-        "name": "get_program",
-        "args": {}
-      }
-    ],
+    "gym-06": [],
     "gym-07": [
       {
         "name": "log_gym_session",
@@ -105,15 +100,15 @@
           "day": "C",
           "lifts": [
             {
-              "exercise": "Stiff unilateral",
+              "exercise": "stiff",
               "load_kg": 16
             },
             {
-              "exercise": "Supino ponte com halter",
+              "exercise": "supino ponte",
               "load_kg": 20
             },
             {
-              "exercise": "Military press semi ajoelhado",
+              "exercise": "military press",
               "load_kg": 12
             }
           ]
@@ -125,7 +120,6 @@
         "name": "log_gym_session",
         "args": {
           "day": "A",
-          "rpe": 9,
           "lifts": [
             {
               "exercise": "Agachamento goblet",
@@ -143,11 +137,17 @@
               "exercise": "Afundo",
               "load_kg": 12
             }
-          ]
+          ],
+          "rpe": 9
         }
       }
     ],
-    "gym-10": [],
+    "gym-10": [
+      {
+        "name": "get_program",
+        "args": {}
+      }
+    ],
     "gym-11": [
       {
         "name": "log_gym_session",
@@ -166,7 +166,7 @@
       {
         "name": "log_gym_session",
         "args": {
-          "day": null,
+          "day": "A",
           "duration_min": 55
         }
       }
@@ -197,10 +197,27 @@
     ],
     "gym-15": [
       {
-        "name": "query_history",
+        "name": "get_program",
+        "args": {}
+      }
+    ],
+    "gym-16": [
+      {
+        "name": "log_gym_session",
         "args": {
-          "kind": "recent_sessions",
-          "period": "this_week"
+          "day": "B",
+          "rpe": 8,
+          "lifts": [
+            {
+              "exercise": "sumo",
+              "load_kg": 24
+            },
+            {
+              "exercise": "rows",
+              "load_kg": 18
+            }
+          ],
+          "notes": "knee was cranky"
         }
       }
     ]

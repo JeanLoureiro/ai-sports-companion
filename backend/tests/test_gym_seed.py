@@ -106,9 +106,18 @@ def test_check_mode_validates_without_a_database(capsys: pytest.CaptureFixture[s
     assert "4 sessions over 2 weeks" in capsys.readouterr().out
 
 
-def test_plain_rows_means_the_bent_over_row() -> None:
+def test_ambiguous_words_are_left_to_the_session_being_logged() -> None:
     index = library_index()
 
-    remada = index.resolve("Remada curvada")
-    assert index.resolve("rows") == remada
-    assert index.resolve("row") == remada
+    # "rows" is Remada curvada on Treino A but Serrote on Treino B: no global alias.
+    assert index.resolve("rows") is None
+    assert index.resolve("supino") is None
+    assert index.resolve("remada") == index.resolve("Remada curvada")
+    assert index.resolve("stiff") == index.resolve("Stiff unilateral")
+
+
+def test_canonical_name_makes_aliases_and_names_compare_equal() -> None:
+    from coach.modules.gym.library import canonical_name
+
+    assert canonical_name("goblet") == canonical_name("Agachamento Goblet")
+    assert canonical_name("rows") == "rows"

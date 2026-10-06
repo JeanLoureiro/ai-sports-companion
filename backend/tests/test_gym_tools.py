@@ -351,3 +351,10 @@ async def test_notes_are_kept_with_the_session(pool: Pool, athlete: Athlete) -> 
             (athlete.id,),
         )
         assert await cur.fetchone() == {"notes": "knee was cranky"}
+
+
+def test_prompt_asks_for_the_athletes_own_words() -> None:
+    prompt = GymModule().prompt(Athlete(UUID(int=1), "J", "Australia/Brisbane", 1))
+
+    assert "as the athlete said" in prompt.lower()
+    assert "Use the Portuguese name in tool calls" not in prompt

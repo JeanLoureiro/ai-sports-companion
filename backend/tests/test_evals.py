@@ -59,12 +59,12 @@ def test_a_case_that_must_not_log_fails_when_it_logs() -> None:
     assert (logged.tool_ok, asked.tool_ok) == (False, True)
 
 
-def test_the_gym_set_has_fifteen_cases_with_known_exercises() -> None:
+def test_the_gym_set_has_sixteen_cases() -> None:
     eval_set = load_set(GYM_SET)
 
     assert eval_set.tool == "log_gym_session"
-    assert len(eval_set.cases) == 15
-    assert len({c.id for c in eval_set.cases}) == 15
+    assert len(eval_set.cases) == 16
+    assert len({c.id for c in eval_set.cases}) == 16
 
 
 async def test_predict_takes_the_models_first_reply() -> None:

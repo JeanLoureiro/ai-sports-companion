@@ -1,5 +1,6 @@
 # Synthetic gym logging messages. expected: the log_gym_session arguments that must be
-# extracted (exercise names as in the library); null means the tool must not be called.
+# extracted, exercise names as resolved for that day's session (names and aliases the
+# library knows compare equal); null means the tool must not be called.
 tool: log_gym_session
 cases:
   - id: gym-01
@@ -47,3 +48,8 @@ cases:
   - id: gym-15
     input: how many gym sessions have I done this week?
     expected: null
+  - id: gym-16
+    # "rows" must reach the tool as said: on Treino B it resolves to Serrote, on A to Remada
+    # curvada (tested in test_short_names_resolve_within_the_session_being_logged).
+    input: did treino B, sumo 24kg, rows 18kg, rpe 8, knee was cranky
+    expected: {day: B, rpe: 8, lifts: [{exercise: Agachamento terra sumo, load_kg: 24}, {exercise: rows, load_kg: 18}]}

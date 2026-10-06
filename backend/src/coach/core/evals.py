@@ -190,7 +190,7 @@ async def _run(args: argparse.Namespace) -> None:
     from coach.core.db import create_pool
     from coach.core.llm import get_chat_model
     from coach.core.registry import default_registry
-    from coach.modules.gym.library import normalize  # the only normalizer so far
+    from coach.modules.gym.library import canonical_name  # the only normalizer so far
 
     registry = default_registry()
     current = fingerprint(registry)
@@ -230,7 +230,7 @@ async def _run(args: argparse.Namespace) -> None:
                     raise SystemExit(f"{eval_set.name}: {err}") from err
                 predictions = recorded["cases"]
             scores = [
-                score_case(c, eval_set.tool, predictions.get(c.id, []), normalize)
+                score_case(c, eval_set.tool, predictions.get(c.id, []), canonical_name)
                 for c in eval_set.cases
             ]
             results[eval_set.name] = summarize(scores)

@@ -73,6 +73,12 @@ class ExerciseIndex:
         return iter(self._exercises)
 
 
+def canonical_name(text: str) -> str:
+    """The normalized library name when the text names a known exercise, else the text."""
+    exercise = library_index().resolve(text)
+    return normalize(exercise.name if exercise else text)
+
+
 @cache
 def library_index() -> ExerciseIndex:
     """The shipped library, loaded once."""
