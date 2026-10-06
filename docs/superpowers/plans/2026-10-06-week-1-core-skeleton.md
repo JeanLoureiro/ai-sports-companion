@@ -138,8 +138,8 @@ htmlcov/
 # Hybrid Athlete Coach
 
 A Telegram coach that logs and plans BJJ, surf and gym training in one place and reasons across all three.
-The full design lives in [the project plan](Hybrid%20Athlete%20Coach%20%E2%80%94%20Project%20Plan.md).
-How the system fits together is in [ARCHITECTURE.md](ARCHITECTURE.md).
+The full design lives in [the project plan](docs/Hybrid%20Athlete%20Coach%20%E2%80%94%20Project%20Plan.md).
+How the system fits together is in [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Local development
 
