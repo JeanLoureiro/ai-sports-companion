@@ -9,7 +9,7 @@ from coach.core.db import Connection
 from coach.core.models import Athlete
 from coach.core.registry import ScheduledJob
 from coach.modules.gym.library import library_index
-from coach.modules.gym.tools import get_program, program_summary
+from coach.modules.gym.tools import get_program, log_gym_session, program_summary
 
 HERE = Path(__file__).parent
 PROMPT = (HERE / "prompt.md").read_text(encoding="utf-8").strip()
@@ -22,7 +22,7 @@ class GymModule:
     migrations = HERE / "migrations"
 
     def tools(self) -> list[BaseTool]:
-        return [get_program]
+        return [get_program, log_gym_session]
 
     def prompt(self, athlete: Athlete) -> str:
         lines = [

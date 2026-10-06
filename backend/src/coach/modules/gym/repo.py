@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from psycopg.types.json import Jsonb
+
 from coach.core.db import Connection
 from coach.core.models import Athlete
 
@@ -63,3 +65,26 @@ async def done_since(conn: Connection, program_id: UUID, since: datetime) -> int
     )
     row = await cur.fetchone()
     return int(row["n"]) if row else 0
+
+
+async def complete_program_session(
+    conn: Connection, program_session_id: UUID, session_id: UUID
+) -> None:
+    """Mark a program session as done by a logged session."""
+    await conn.execute(
+        "update program_sessions set completed_session_id = %s where id = %s",
+        (session_id, program_session_id),
+    )
+
+
+async def insert_details(
+    conn: Connection,
+    session_id: UUID,
+    program_session_id: UUID | None,
+    lifts: list[dict[str, Any]],
+) -> None:
+    """The gym part of a logged session."""
+    await conn.execute(
+        "insert into gym_details (session_id, program_session_id, lifts) values (%s, %s, %s)",
+        (session_id, program_session_id, Jsonb(lifts)),
+    )

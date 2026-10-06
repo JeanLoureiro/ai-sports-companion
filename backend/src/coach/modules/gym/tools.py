@@ -1,17 +1,30 @@
 """Gym tools bound to the agent."""
 
 import json
-from datetime import datetime
-from typing import Any
+import re
+from datetime import UTC, datetime
+from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolRuntime
+from pydantic import BaseModel, Field
 
 from coach.core.context import CoachContext
 from coach.core.db import Connection
-from coach.core.models import Athlete
+from coach.core.models import Athlete, ReplyButton
+from coach.core.repo import create_session
 from coach.core.tools import history_window
-from coach.modules.gym.repo import active_program, done_since, next_pending, prescriptions, progress
+from coach.modules.gym.library import ExerciseIndex, library_index, normalize
+from coach.modules.gym.repo import (
+    active_program,
+    complete_program_session,
+    done_since,
+    insert_details,
+    next_pending,
+    prescriptions,
+    progress,
+)
 
 
 async def program_summary(
@@ -53,3 +66,127 @@ async def get_program(runtime: ToolRuntime[CoachContext]) -> str:
     if summary is None:
         summary = {"program": None, "message": "No active gym program has been seeded."}
     return json.dumps(summary, default=str, ensure_ascii=False)
+
+
+class LiftLog(BaseModel):
+    """One exercise the athlete mentioned. Fill only what they said."""
+
+    exercise: str = Field(description="As the athlete said it, Portuguese or English")
+    load_kg: float | None = Field(default=None, ge=0, description="Dumbbell weight in kg")
+    sets: int | None = Field(default=None, ge=1)
+    reps: str | None = None
+    swapped_to: str | None = Field(default=None, description="What they did instead")
+    skipped: bool = False
+
+
+def merge_lifts(
+    planned: list[dict[str, Any]], lifts: list[LiftLog], index: ExerciseIndex
+) -> list[dict[str, Any]]:
+    """Main-block exercises as prescribed, overridden by what the athlete mentioned.
+
+    Prep exercises are stored only when mentioned; unknown exercises are kept as said.
+    """
+    mentioned: dict[str, tuple[str, LiftLog, bool]] = {}
+    for lift in lifts:
+        known = index.resolve(lift.exercise)
+        name = known.name if known else lift.exercise
+        mentioned[normalize(name)] = (name, lift, known is not None)
+    entries: list[dict[str, Any]] = []
+    for p in planned:
+        said = mentioned.pop(normalize(p["exercise"]), None)
+        if p["block"] != "main" and said is None:
+            continue
+        entry: dict[str, Any] = {
+            "exercise": p["exercise"],
+            "planned": {"sets": p["sets"], "reps": p["reps"], "tempo": p["tempo"]},
+            "done": True,
+        }
+        if said is not None:
+            entry.update(_said(said[1], index))
+        entries.append(entry)
+    for name, lift, is_known in mentioned.values():
+        entries.append({"exercise": name, "extra": True, "known": is_known, **_said(lift, index)})
+    return entries
+
+
+def _said(lift: LiftLog, index: ExerciseIndex) -> dict[str, Any]:
+    out: dict[str, Any] = {"done": not lift.skipped}
+    if lift.load_kg is not None:
+        out["load_kg"] = lift.load_kg
+    if lift.sets is not None:
+        out["sets"] = lift.sets
+    if lift.reps is not None:
+        out["reps"] = lift.reps
+    if lift.swapped_to is not None:
+        swapped = index.resolve(lift.swapped_to)
+        out["swapped_to"] = swapped.name if swapped else lift.swapped_to
+    return out
+
+
+def _day_label(day: str | None) -> str | None:
+    if not day:
+        return None
+    match = re.search(r"([a-z])\s*$", normalize(day))
+    return match.group(1).upper() if match else None
+
+
+def _started_at(value: datetime | None, ctx: CoachContext) -> datetime:
+    if value is None:
+        return ctx.now()
+    if value.tzinfo is None:
+        return value.replace(tzinfo=ZoneInfo(ctx.athlete.timezone)).astimezone(UTC)
+    return value
+
+
+@tool
+async def log_gym_session(
+    runtime: ToolRuntime[CoachContext],
+    day: Annotated[str | None, Field(description="Program day if named: A, B or C")] = None,
+    started_at: Annotated[
+        datetime | None, Field(description="Local date and time; omit for now")
+    ] = None,
+    duration_min: Annotated[int | None, Field(ge=1, le=600)] = None,
+    rpe: Annotated[int | None, Field(ge=1, le=10)] = None,
+    notes: Annotated[str | None, Field(description="Anything else, in their words")] = None,
+    lifts: list[LiftLog] | None = None,
+) -> str:
+    """Log one gym session against the program. Everything not mentioned counts as done as
+    prescribed. Without a day, it completes the next pending session; with a day, the first
+    pending session for that day. Call once per session."""
+    ctx = runtime.context
+    index = library_index()
+    label_day = _day_label(day)
+    async with ctx.pool.connection() as conn, conn.transaction():
+        program = await active_program(conn, ctx.athlete)
+        planned = None
+        if program is not None:
+            planned = await next_pending(conn, program["id"], day_label=label_day)
+        planned_rows = await prescriptions(conn, planned["id"]) if planned else []
+        entries = merge_lifts(planned_rows, lifts or [], index)
+        label = planned["label"] if planned else "Extra gym session"
+        session_id = await create_session(
+            conn,
+            ctx.athlete,
+            discipline="gym",
+            started_at=_started_at(started_at, ctx),
+            duration_min=duration_min,
+            rpe=rpe,
+            summary=label,
+        )
+        await insert_details(conn, session_id, planned["id"] if planned else None, entries)
+        if planned is not None:
+            await complete_program_session(conn, planned["id"], session_id)
+        total = (await progress(conn, program["id"]))["total"] if program else 0
+    ctx.reply_buttons.append(ReplyButton(text="Undo", data=f"undo:{session_id}"))
+    changed = [e for e in entries if set(e) - {"exercise", "planned", "done"} or not e["done"]]
+    detail = json.dumps(changed, ensure_ascii=False) if changed else "everything as prescribed"
+    if planned is None:
+        if label_day:
+            reason = f"no pending Treino {label_day} left"
+        else:
+            reason = "the program is complete" if program else "no active program"
+        return f"Logged as an extra session ({reason}). Changes: {detail}. Notes: {notes or '-'}"
+    return (
+        f"Logged {label} (session {planned['position']} of {total}). "
+        f"Changes: {detail}. Notes: {notes or '-'}"
+    )
