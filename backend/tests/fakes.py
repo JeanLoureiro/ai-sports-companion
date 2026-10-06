@@ -1,11 +1,13 @@
 """Test doubles shared across the suite."""
 
+import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import anthropic
+import httpx
 import httpx2
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models import LanguageModelInput
@@ -14,11 +16,20 @@ from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatResult
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool, tool
+from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import Field
 
-from coach.core.db import Connection
+from coach.core.config import Settings
+from coach.core.db import Connection, Pool
+from coach.core.deps import Deps
+from coach.core.graph import build_graph
 from coach.core.models import Athlete
-from coach.core.registry import ScheduledJob
+from coach.core.registry import Registry, ScheduledJob
+from coach.core.telegram import TelegramClient
+from tests.conftest import TEST_DATABASE_URL
+
+TEST_TOKEN = "TEST:TOKEN"
+WEBHOOK_SECRET = "hook-secret"
 
 
 @tool
@@ -98,3 +109,67 @@ class ExplodingChatModel(FakeChatModel):
         raise anthropic.APIConnectionError(
             request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
         )
+
+
+class TelegramRecorder:
+    """A fake Bot API: records calls, serves queued getUpdates batches, can fail a method."""
+
+    def __init__(self, *, fail_on: str | None = None) -> None:
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.update_batches: list[list[dict[str, Any]]] = []
+        self.fail_on = fail_on
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        method = request.url.path.rsplit("/", 1)[-1]
+        payload: dict[str, Any] = json.loads(request.content or b"{}")
+        self.calls.append((method, payload))
+        if method == self.fail_on:
+            return httpx.Response(400, json={"ok": False, "description": "Bad Request"})
+        result: Any = True
+        if method == "getUpdates":
+            result = self.update_batches.pop(0) if self.update_batches else []
+        elif method == "sendMessage":
+            result = {"message_id": len(self.calls)}
+        return httpx.Response(200, json={"ok": True, "result": result})
+
+    def client(self) -> TelegramClient:
+        http = httpx.AsyncClient(transport=httpx.MockTransport(self.handler))
+        return TelegramClient(TEST_TOKEN, http)
+
+    def methods(self) -> list[str]:
+        return [method for method, _ in self.calls]
+
+    def sent_texts(self) -> list[str]:
+        return [str(p["text"]) for m, p in self.calls if m == "sendMessage"]
+
+
+def make_deps(
+    pool: Pool, model: FakeChatModel, recorder: TelegramRecorder, *, allowed: list[int]
+) -> Deps:
+    settings = Settings.model_validate(
+        {
+            "database_url": TEST_DATABASE_URL,
+            "telegram_bot_token": TEST_TOKEN,
+            "telegram_webhook_secret": WEBHOOK_SECRET,
+            "telegram_allowed_chat_ids": allowed,
+            "anthropic_api_key": "sk-test",
+            "agent_model": "test-model",
+        }
+    )
+    registry = Registry([])
+    return Deps(
+        settings=settings,
+        pool=pool,
+        registry=registry,
+        graph=build_graph(model, registry, InMemorySaver()),
+        telegram=recorder.client(),
+    )
+
+
+def text_update(update_id: int, chat_id: int, text: str | None = "hi") -> dict[str, Any]:
+    message: dict[str, Any] = {"message_id": 1, "chat": {"id": chat_id, "type": "private"}}
+    if text is not None:
+        message["text"] = text
+    else:
+        message["photo"] = [{"file_id": "abc", "width": 1, "height": 1}]
+    return {"update_id": update_id, "message": message}
