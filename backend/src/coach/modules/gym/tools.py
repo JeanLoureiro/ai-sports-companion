@@ -1,9 +1,8 @@
 """Gym tools bound to the agent."""
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Annotated, Any
-from zoneinfo import ZoneInfo
 
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolRuntime
@@ -158,14 +157,6 @@ def _day_label(day: str) -> str | None:
     return words[0].upper() if len(words) == 1 and len(words[0]) == 1 else None
 
 
-def _started_at(value: datetime | None, ctx: CoachContext) -> datetime:
-    if value is None:
-        return ctx.now()
-    if value.tzinfo is None:
-        return value.replace(tzinfo=ZoneInfo(ctx.athlete.timezone)).astimezone(UTC)
-    return value
-
-
 @tool
 async def log_gym_session(
     runtime: ToolRuntime[CoachContext],
@@ -210,7 +201,7 @@ async def log_gym_session(
             conn,
             ctx.athlete,
             discipline="gym",
-            started_at=_started_at(started_at, ctx),
+            started_at=ctx.local_to_utc(started_at),
             duration_min=duration_min,
             rpe=rpe,
             summary=label,

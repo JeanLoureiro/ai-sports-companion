@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -27,3 +28,11 @@ class CoachContext:
     http: httpx.AsyncClient | None = None
     # Tools append; the handler sends them under the reply. Mutable on purpose.
     reply_buttons: list[ReplyButton] = field(default_factory=list)
+
+    def local_to_utc(self, value: datetime | None) -> datetime:
+        """None is now; a time without a zone is the athlete's local time."""
+        if value is None:
+            return self.now()
+        if value.tzinfo is None:
+            return value.replace(tzinfo=ZoneInfo(self.athlete.timezone)).astimezone(UTC)
+        return value

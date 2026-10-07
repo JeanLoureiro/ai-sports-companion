@@ -5,13 +5,15 @@ from typing import Any
 import httpx
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langgraph.checkpoint.memory import InMemorySaver
 
 from coach.core.context import CoachContext
 from coach.core.db import Pool
 from coach.core.graph import build_graph
-from coach.core.models import Athlete
+from coach.core.models import Athlete, Location
 from coach.core.registry import Registry
 from coach.core.repo import create_session
+from coach.core.turn import run_turn
 from coach.modules.surf.forecast import MARINE_URL
 from coach.modules.surf.module import SurfModule
 from coach.modules.surf.seed import seed_spots
@@ -144,3 +146,98 @@ async def test_history_groups_sessions_by_spot(pool: Pool, athlete: Athlete) -> 
     [spot] = result["spots"]
     assert (spot["spot"], spot["sessions"], spot["avg_waves"]) == ("Burleigh Heads", 2, 9.0)
     assert spot["best"]["waves_caught"] == 12
+
+
+async def surf_rows(pool: Pool, athlete: Athlete) -> list[dict[str, Any]]:
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "select s.id, s.started_at, s.duration_min, s.summary, sp.name as spot, "
+            "d.wave_height_min_ft, d.wave_height_max_ft, d.waves_caught, d.notes "
+            "from sessions s join surf_details d on d.session_id = s.id "
+            "left join surf_spots sp on sp.id = d.spot_id where s.athlete_id = %s",
+            (athlete.id,),
+        )
+        return await cur.fetchall()
+
+
+def log_call(**args: Any) -> AIMessage:
+    return AIMessage(
+        content="", tool_calls=[{"name": "log_surf_session", "args": args, "id": "l1"}]
+    )
+
+
+async def test_logs_a_session_at_a_known_spot(pool: Pool, athlete: Athlete) -> None:
+    await seeded(pool, athlete)
+    turn = ctx(athlete, pool)
+
+    await call_tool(
+        turn,
+        "log_surf_session",
+        {
+            "spot": "burleigh",
+            "started_at": "2026-10-08T06:00:00",
+            "duration_min": 120,
+            "wave_height_min_ft": 3,
+            "wave_height_max_ft": 4,
+            "waves_caught": 12,
+            "notes": "struggled on my backhand",
+        },
+    )
+
+    [row] = await surf_rows(pool, athlete)
+    assert (row["spot"], row["waves_caught"], row["notes"]) == (
+        "Burleigh Heads",
+        12,
+        "struggled on my backhand",
+    )
+    assert row["started_at"] == datetime(2026, 10, 7, 20, 0, tzinfo=UTC)
+    assert turn.reply_buttons[0].data == f"undo:{row['id']}"
+
+
+async def test_an_unknown_spot_asks_for_a_pin_and_creates_it(pool: Pool, athlete: Athlete) -> None:
+    await seeded(pool, athlete)
+    model = scripted(log_call(spot="Kirra", waves_caught=7), "Logged at Kirra.")
+    graph = build_graph(model, SURF, InMemorySaver())
+    turn = ctx(athlete, pool)
+
+    asked = await run_turn(graph, turn, "kirra this arvo, 7 waves", model_name="m")
+    done = await run_turn(
+        graph, turn, "(shared a location)", model_name="m", location=Location(-28.167, 153.531)
+    )
+
+    assert "location pin" in asked.reply
+    assert done.reply == "Logged at Kirra."
+    [row] = await surf_rows(pool, athlete)
+    assert (row["spot"], row["waves_caught"]) == ("Kirra", 7)
+
+
+async def test_naming_a_saved_spot_answers_the_question_and_learns_the_alias(
+    pool: Pool, athlete: Athlete
+) -> None:
+    await seeded(pool, athlete)
+    model = scripted(log_call(spot="the point"), "Logged at Burleigh.")
+    graph = build_graph(model, SURF, InMemorySaver())
+    turn = ctx(athlete, pool)
+
+    await run_turn(graph, turn, "the point this morning", model_name="m")
+    await run_turn(graph, turn, "burleigh", model_name="m")
+
+    [row] = await surf_rows(pool, athlete)
+    assert row["spot"] == "Burleigh Heads"
+    async with pool.connection() as conn:
+        assert (await resolve_spot(conn, athlete, "the point")) is not None
+
+
+async def test_an_unrelated_reply_still_logs_the_session_without_a_spot(
+    pool: Pool, athlete: Athlete
+) -> None:
+    await seeded(pool, athlete)
+    model = scripted(log_call(spot="somewhere up north", waves_caught=4), "Logged.")
+    graph = build_graph(model, SURF, InMemorySaver())
+    turn = ctx(athlete, pool)
+
+    await run_turn(graph, turn, "surfed somewhere up north", model_name="m")
+    await run_turn(graph, turn, "how much did I train this week?", model_name="m")
+
+    [row] = await surf_rows(pool, athlete)
+    assert (row["spot"], row["waves_caught"]) == (None, 4)
