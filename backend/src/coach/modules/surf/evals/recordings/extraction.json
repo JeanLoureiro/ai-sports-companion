@@ -1,0 +1,161 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "fingerprint": "55da8b14658ab3de",
+  "cases": {
+    "surf-01": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "Burleigh",
+          "duration_min": 120,
+          "wave_height_min_ft": 3,
+          "wave_height_max_ft": 4,
+          "waves_caught": 12,
+          "notes": "struggled on backhand"
+        }
+      }
+    ],
+    "surf-02": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "Snapper",
+          "duration_min": 60,
+          "wave_height_min_ft": 2,
+          "wave_height_max_ft": 3,
+          "wind": "onshore",
+          "waves_caught": 5
+        }
+      }
+    ],
+    "surf-03": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "D'Bah",
+          "duration_min": 90,
+          "board": "6'0",
+          "waves_caught": 8
+        }
+      }
+    ],
+    "surf-04": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "the Alley",
+          "duration_min": 45,
+          "tide": "mid",
+          "wave_height_min_ft": 2,
+          "wave_height_max_ft": 2
+        }
+      }
+    ],
+    "surf-05": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "Snapper",
+          "wave_height_min_ft": 4,
+          "wave_height_max_ft": 6,
+          "wind": "offshore",
+          "duration_min": 180,
+          "rpe": 8
+        }
+      }
+    ],
+    "surf-06": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "Currumbin Alley",
+          "board": "longboard",
+          "waves_caught": 20
+        }
+      }
+    ],
+    "surf-07": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "Burleigh",
+          "duration_min": 90,
+          "wave_height_min_ft": 3,
+          "wave_height_max_ft": 3,
+          "tide": "low",
+          "waves_caught": 10
+        }
+      }
+    ],
+    "surf-08": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "Kirra",
+          "waves_caught": 7
+        }
+      }
+    ],
+    "surf-09": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "Superbank",
+          "duration_min": 120,
+          "waves_caught": 6,
+          "notes": "crowded"
+        }
+      }
+    ],
+    "surf-10": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "D'Bah",
+          "wave_height_min_ft": 3,
+          "wave_height_max_ft": 4,
+          "wind": "light offshore",
+          "waves_caught": 15
+        }
+      }
+    ],
+    "surf-11": [],
+    "surf-12": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "Snapper",
+          "board": "5'10",
+          "tide": "high",
+          "duration_min": 60
+        }
+      }
+    ],
+    "surf-13": [
+      {
+        "name": "log_surf_session",
+        "args": {
+          "spot": "Currumbin Alley",
+          "duration_min": 120
+        }
+      }
+    ],
+    "surf-14": [
+      {
+        "name": "get_surf_forecast",
+        "args": {
+          "days": 2
+        }
+      }
+    ],
+    "surf-15": [
+      {
+        "name": "surf_history",
+        "args": {
+          "spot": "Burleigh",
+          "days": 31
+        }
+      }
+    ]
+  }
+}

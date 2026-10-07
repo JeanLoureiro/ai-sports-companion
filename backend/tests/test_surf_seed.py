@@ -66,3 +66,13 @@ async def test_new_spots_and_aliases(conn: Connection, athlete: Athlete) -> None
     found_point = await resolve_spot(conn, athlete, "the point")
     assert found_kirra is not None and found_kirra["id"] == kirra["id"]
     assert found_point is not None and found_point["name"] == "Burleigh Heads"
+
+
+def test_shipped_spot_names_canonicalize_for_eval_scoring() -> None:
+    from coach.modules.surf.module import SurfModule
+
+    surf = SurfModule()
+
+    assert surf.canonical("dbah") == surf.canonical("D'Bah") == "Duranbah"
+    assert surf.canonical("currumbin") == "Currumbin Alley"
+    assert surf.canonical("kirra") is None

@@ -1,6 +1,7 @@
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 import httpx
 import pytest
@@ -241,3 +242,34 @@ async def test_an_unrelated_reply_still_logs_the_session_without_a_spot(
 
     [row] = await surf_rows(pool, athlete)
     assert (row["spot"], row["waves_caught"]) == (None, 4)
+
+
+async def test_context_summarises_recent_surfing(pool: Pool, athlete: Athlete) -> None:
+    await seeded(pool, athlete)
+    # context() reads the real clock, so log relative to it.
+    yesterday = (datetime.now(UTC) - timedelta(days=1)).isoformat()
+    await call_tool(
+        ctx(athlete, pool),
+        "log_surf_session",
+        {
+            "spot": "burleigh",
+            "started_at": yesterday,
+            "wave_height_min_ft": 3,
+            "wave_height_max_ft": 4,
+            "waves_caught": 12,
+        },
+    )
+
+    async with pool.connection() as conn:
+        line = await SurfModule().context(conn, athlete)
+
+    assert line.startswith("Last surf ")
+    assert "Burleigh Heads (3-4 ft, 12 waves)" in line
+
+
+def test_prompt_explains_feet_spots_and_estimates() -> None:
+    prompt = SurfModule().prompt(
+        Athlete(id=UUID(int=1), name="J", timezone="Australia/Brisbane", telegram_chat_id=1)
+    )
+
+    assert "feet" in prompt and "Duranbah" in prompt and "estimate" in prompt

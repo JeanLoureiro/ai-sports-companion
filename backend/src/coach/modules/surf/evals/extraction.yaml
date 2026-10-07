@@ -1,0 +1,49 @@
+# Synthetic surf logging messages. expected: the log_surf_session arguments to extract;
+# null means the tool must not be called. Spot names compare as said.
+tool: log_surf_session
+cases:
+  - id: surf-01
+    input: Burleigh this morning, 2 hours, 3-4 ft, caught 12, struggled on my backhand
+    expected: {spot: Burleigh, duration_min: 120, wave_height_min_ft: 3, wave_height_max_ft: 4, waves_caught: 12}
+  - id: surf-02
+    input: surfed snapper for an hour, 2-3ft and onshore, only got 5
+    expected: {spot: snapper, duration_min: 60, wave_height_min_ft: 2, wave_height_max_ft: 3, wind: onshore, waves_caught: 5}
+  - id: surf-03
+    input: dbah 90 mins on the 6'0, 8 waves
+    expected: {spot: dbah, duration_min: 90, board: 6'0, waves_caught: 8}
+  - id: surf-04
+    input: quick 45 min at the alley, mid tide, 2ft
+    expected: {spot: the alley, duration_min: 45, tide: mid, wave_height_max_ft: 2}
+  - id: surf-05
+    input: Snapper was pumping, 4-6ft offshore, 3 hours, rpe 8
+    expected: {spot: Snapper, wave_height_min_ft: 4, wave_height_max_ft: 6, wind: offshore, duration_min: 180, rpe: 8}
+  - id: surf-06
+    input: surfed currumbin, caught 20 waves on the longboard
+    expected: {spot: currumbin, waves_caught: 20, board: longboard}
+  - id: surf-07
+    input: Burleigh 1.5 hours, 3ft, low tide, 10 waves
+    expected: {spot: Burleigh, duration_min: 90, wave_height_max_ft: 3, tide: low, waves_caught: 10}
+  - id: surf-08
+    input: kirra this arvo, 7 waves
+    expected: {spot: kirra, waves_caught: 7}
+  - id: surf-09
+    input: Superbank 2 hours, crowded, 6 waves
+    expected: {spot: Superbank, duration_min: 120, waves_caught: 6}
+  - id: surf-10
+    input: dawny at D'Bah, 3-4ft, light offshore, 15 waves
+    expected: {spot: D'Bah, wave_height_min_ft: 3, wave_height_max_ft: 4, wind: light offshore, waves_caught: 15}
+  - id: surf-11
+    input: an hour at the point, 2-3 ft, rpe 6
+    expected: {spot: the point, duration_min: 60, wave_height_min_ft: 2, wave_height_max_ft: 3, rpe: 6}
+  - id: surf-12
+    input: surfed snapper on the 5'10, high tide, 1 hour
+    expected: {spot: snapper, board: 5'10, tide: high, duration_min: 60}
+  - id: surf-13
+    input: 2 hour surf at Currumbin Alley
+    expected: {spot: Currumbin Alley, duration_min: 120}
+  - id: surf-14
+    input: where should I surf tomorrow morning?
+    expected: null
+  - id: surf-15
+    input: how many waves did I catch at burleigh this month?
+    expected: null
