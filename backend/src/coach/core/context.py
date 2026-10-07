@@ -4,6 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+import httpx
+
 from coach.core.db import Pool
 from coach.core.models import Athlete, ReplyButton
 from coach.core.registry import Registry
@@ -21,5 +23,7 @@ class CoachContext:
     pool: Pool
     registry: Registry
     now: Callable[[], datetime] = field(default=_utcnow)
+    # For tools that call external APIs (forecasts); tests pass a mock transport.
+    http: httpx.AsyncClient | None = None
     # Tools append; the handler sends them under the reply. Mutable on purpose.
     reply_buttons: list[ReplyButton] = field(default_factory=list)

@@ -1,16 +1,17 @@
 """One agent turn: run the graph on the athlete's thread and record it in agent_runs."""
 
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 from uuid import UUID
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.types import Command
 
 from coach.core.context import CoachContext
 from coach.core.graph import CoachGraph
-from coach.core.models import AgentRun, Athlete, Trigger
+from coach.core.models import AgentRun, Athlete, Location, Trigger
 from coach.core.registry import Registry
 from coach.core.repo import record_agent_run
 
@@ -35,18 +36,27 @@ async def run_turn(
     *,
     model_name: str,
     trigger: Trigger = "message",
+    location: Location | None = None,
 ) -> TurnResult:
-    """Run one turn on the athlete's single thread; any failure becomes the fallback reply."""
+    """Run one turn on the athlete's single thread; a pending interrupt is resumed by this
+    message (text or location pin) and any failure becomes the fallback reply."""
     config: RunnableConfig = {"configurable": {"thread_id": str(ctx.athlete.id)}}
     snapshot = await graph.aget_state(config)
     seen = {m.id for m in snapshot.values.get("messages", [])}
+    pending = [i for task in snapshot.tasks for i in task.interrupts]
+    payload: Any
+    if pending:
+        payload = Command(resume={"text": text, "location": asdict(location) if location else None})
+    else:
+        payload = {"messages": [HumanMessage(content=text)]}
     started = time.perf_counter()
     new: list[BaseMessage] = []
     error: str | None = None
     try:
-        out = await graph.ainvoke({"messages": [HumanMessage(content=text)]}, config, context=ctx)
+        out = await graph.ainvoke(payload, config, context=ctx)
         new = [m for m in out["messages"] if m.id not in seen]
-        reply = _final_reply(new)
+        interrupts = out.get("__interrupt__") or []
+        reply = _question(interrupts[0].value) if interrupts else _final_reply(new)
     except Exception as err:  # noqa: BLE001 - the athlete always gets an answer and a record
         error = f"{type(err).__name__}: {err}"
         reply = FALLBACK_REPLY
@@ -66,6 +76,12 @@ async def run_turn(
     async with ctx.pool.connection() as conn:
         run_id = await record_agent_run(conn, run)
     return TurnResult(reply=reply, run_id=run_id, error=error)
+
+
+def _question(value: Any) -> str:
+    if isinstance(value, dict) and isinstance(value.get("question"), str):
+        return str(value["question"])
+    return str(value)
 
 
 def _final_reply(messages: list[BaseMessage]) -> str:
