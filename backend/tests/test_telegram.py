@@ -157,7 +157,7 @@ async def test_build_deps_wires_the_real_stack_without_network_calls() -> None:
     )
 
     async with build_deps(settings) as deps:
-        assert [m.name for m in deps.registry.modules] == ["gym"]
+        assert [m.name for m in deps.registry.modules] == ["gym", "surf"]
         assert isinstance(deps.telegram, TelegramClient)
         assert deps.graph.checkpointer is not None
 
