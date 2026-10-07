@@ -7,6 +7,7 @@ from langchain_core.tools import BaseTool
 from coach.core.db import Connection
 from coach.core.models import Athlete
 from coach.core.registry import ScheduledJob
+from coach.modules.surf.tools import get_surf_forecast, surf_history
 
 HERE = Path(__file__).parent
 
@@ -18,7 +19,7 @@ class SurfModule:
     migrations = HERE / "migrations"
 
     def tools(self) -> list[BaseTool]:
-        return []
+        return [get_surf_forecast, surf_history]
 
     def prompt(self, athlete: Athlete) -> str:
         return ""
