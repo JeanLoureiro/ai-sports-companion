@@ -99,13 +99,14 @@ def wind_relation(spot: Spot, wind_from: float) -> WindRelation:
 
 
 def rate(spot: Spot, hour: Hour) -> int:
-    """0 to 5: +2 size (+1 period of 10 s or more), +1 swell direction, +1 offshore or light
-    wind, -1 onshore at 12 kn or more; all against the spot's profile."""
-    score = 0
-    if hour.swell_m >= (spot.min_swell_m or 0.5):
-        score += 2
-        if hour.period_s >= 10:
-            score += 1
+    """0 to 5 against the spot's profile: 0 below the minimum size; otherwise 2, +1 for a
+    period of 10 s or more, +1 swell direction, +1 offshore or light wind, -1 onshore at
+    12 kn or more."""
+    if hour.swell_m < (spot.min_swell_m or 0.5):
+        return 0  # direction and wind do not matter when it is flat
+    score = 2
+    if hour.period_s >= 10:
+        score += 1
     if spot.swell_from is None or in_range(hour.swell_from, *spot.swell_from):
         score += 1
     relation = wind_relation(spot, hour.wind_from)

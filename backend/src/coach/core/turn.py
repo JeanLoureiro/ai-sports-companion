@@ -2,6 +2,7 @@
 
 import time
 from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +15,9 @@ from coach.core.graph import CoachGraph
 from coach.core.models import AgentRun, Athlete, Location, Trigger
 from coach.core.registry import Registry
 from coach.core.repo import record_agent_run
+
+# A question left unanswered this long no longer captures the athlete's next message.
+STALE_QUESTION = timedelta(hours=6)
 
 FALLBACK_REPLY = (
     "Sorry, I couldn't reach the coach model just now. Your message arrived; try again in a minute."
@@ -44,17 +48,27 @@ async def run_turn(
     snapshot = await graph.aget_state(config)
     seen = {m.id for m in snapshot.values.get("messages", [])}
     pending = [i for task in snapshot.tasks for i in task.interrupts]
+    asked_at = snapshot.created_at
+    stale = asked_at is not None and ctx.now() - datetime.fromisoformat(asked_at) > STALE_QUESTION
     payload: Any
-    if pending:
-        payload = Command(resume={"text": text, "location": asdict(location) if location else None})
+    if pending and not stale:
+        answer = {
+            "text": text,
+            "location": asdict(location) if location else None,
+            "asked_at": asked_at,
+        }
+        # Answer one question at a time; any other open question is asked again next turn.
+        payload = Command(resume={pending[0].id: answer})
     else:
         payload = {"messages": [HumanMessage(content=text)]}
     started = time.perf_counter()
     new: list[BaseMessage] = []
+    every: list[BaseMessage] = []
     error: str | None = None
     try:
         out = await graph.ainvoke(payload, config, context=ctx)
-        new = [m for m in out["messages"] if m.id not in seen]
+        every = list(out["messages"])
+        new = [m for m in every if m.id not in seen]
         interrupts = out.get("__interrupt__") or []
         reply = _question(interrupts[0].value) if interrupts else _final_reply(new)
     except Exception as err:  # noqa: BLE001 - the athlete always gets an answer and a record
@@ -68,7 +82,7 @@ async def run_turn(
         output=reply,
         model=model_name,
         latency_ms=round((time.perf_counter() - started) * 1000),
-        tool_calls=_tool_calls(new, ctx.registry),
+        tool_calls=_tool_calls(every, new, ctx.registry),
         input_tokens=sum(u["input_tokens"] for u in usages),
         output_tokens=sum(u["output_tokens"] for u in usages),
         error=error,
@@ -91,13 +105,19 @@ def _final_reply(messages: list[BaseMessage]) -> str:
     return "Done."
 
 
-def _tool_calls(messages: list[BaseMessage], registry: Registry) -> list[dict[str, Any]]:
-    results = {m.tool_call_id: m for m in messages if isinstance(m, ToolMessage)}
+def _tool_calls(
+    every: list[BaseMessage], new: list[BaseMessage], registry: Registry
+) -> list[dict[str, Any]]:
+    """Calls made this turn, plus earlier calls this turn finished (a resumed interrupt)."""
+    new_ids = {m.id for m in new}
+    results = {m.tool_call_id: m for m in new if isinstance(m, ToolMessage)}
     calls: list[dict[str, Any]] = []
-    for message in messages:
+    for message in every:
         if not isinstance(message, AIMessage):
             continue
         for call in message.tool_calls:
+            if message.id not in new_ids and (call["id"] or "") not in results:
+                continue
             result = results.get(call["id"] or "")
             calls.append(
                 {
@@ -115,3 +135,10 @@ async def note_in_thread(graph: CoachGraph, athlete: Athlete, text: str) -> None
     """Add an assistant note to the athlete's thread, e.g. that a log was undone."""
     config: RunnableConfig = {"configurable": {"thread_id": str(athlete.id)}}
     await graph.aupdate_state(config, {"messages": [AIMessage(content=text)]}, as_node="agent")
+
+
+async def has_pending_question(graph: CoachGraph, athlete: Athlete) -> bool:
+    """Whether the athlete's thread is waiting for an answer to an interrupt."""
+    config: RunnableConfig = {"configurable": {"thread_id": str(athlete.id)}}
+    snapshot = await graph.aget_state(config)
+    return any(task.interrupts for task in snapshot.tasks)

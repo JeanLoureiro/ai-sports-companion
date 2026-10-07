@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from coach.core.context import CoachContext
 from coach.core.db import Connection
 from coach.core.models import Athlete, ReplyButton
-from coach.core.repo import create_session
+from coach.core.repo import create_session, session_for_call
 from coach.core.tools import history_window
 from coach.modules.gym.library import ExerciseIndex, library_index, normalize
 from coach.modules.gym.repo import (
@@ -183,6 +183,9 @@ async def log_gym_session(
     index = library_index()
     label_day = _day_label(day) if day else None
     async with ctx.pool.connection() as conn, conn.transaction():
+        already = await session_for_call(conn, ctx.athlete, runtime.tool_call_id)
+        if already is not None:
+            return f"Already logged by this call (session {already})."
         program = await active_program(conn, ctx.athlete)
         planned = None
         if program is not None:
@@ -205,6 +208,7 @@ async def log_gym_session(
             duration_min=duration_min,
             rpe=rpe,
             summary=label,
+            call_id=runtime.tool_call_id,
         )
         await insert_details(conn, session_id, planned["id"] if planned else None, entries, notes)
         if planned is not None:

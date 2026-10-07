@@ -58,7 +58,16 @@ async def seeded(pool: Pool, athlete: Athlete) -> None:
         await seed_spots(conn, athlete, load_spots(SPOTS_PATH))
 
 
-def ctx(athlete: Athlete, pool: Pool, http: httpx.AsyncClient | None = None) -> CoachContext:
+def ctx(
+    athlete: Athlete,
+    pool: Pool,
+    http: httpx.AsyncClient | None = None,
+    *,
+    real_clock: bool = False,
+) -> CoachContext:
+    # Interrupt tests compare against checkpoint times, which use the real clock.
+    if real_clock:
+        return CoachContext(athlete=athlete, pool=pool, registry=SURF, http=http or forecast_http())
     return CoachContext(
         athlete=athlete, pool=pool, registry=SURF, now=lambda: NOW, http=http or forecast_http()
     )
@@ -85,6 +94,7 @@ async def test_forecast_for_one_spot_rates_the_morning_best(pool: Pool, athlete:
     assert snapper["name"] == "Snapper Rocks"
     morning = snapper["windows"][0]
     assert (morning["window"], morning["wind"], morning["rating"]) == ("morning", "offshore", 5)
+    assert morning["time"] == "07:00"  # it is 07:00 in Brisbane: earlier hours are not forecasts
     assert snapper["tides"]
     assert "regional" in result["note"]
 
@@ -199,7 +209,7 @@ async def test_an_unknown_spot_asks_for_a_pin_and_creates_it(pool: Pool, athlete
     await seeded(pool, athlete)
     model = scripted(log_call(spot="Kirra", waves_caught=7), "Logged at Kirra.")
     graph = build_graph(model, SURF, InMemorySaver())
-    turn = ctx(athlete, pool)
+    turn = ctx(athlete, pool, real_clock=True)
 
     asked = await run_turn(graph, turn, "kirra this arvo, 7 waves", model_name="m")
     done = await run_turn(
@@ -218,7 +228,7 @@ async def test_naming_a_saved_spot_answers_the_question_and_learns_the_alias(
     await seeded(pool, athlete)
     model = scripted(log_call(spot="the point"), "Logged at Burleigh.")
     graph = build_graph(model, SURF, InMemorySaver())
-    turn = ctx(athlete, pool)
+    turn = ctx(athlete, pool, real_clock=True)
 
     await run_turn(graph, turn, "the point this morning", model_name="m")
     await run_turn(graph, turn, "burleigh", model_name="m")
@@ -235,13 +245,35 @@ async def test_an_unrelated_reply_still_logs_the_session_without_a_spot(
     await seeded(pool, athlete)
     model = scripted(log_call(spot="somewhere up north", waves_caught=4), "Logged.")
     graph = build_graph(model, SURF, InMemorySaver())
-    turn = ctx(athlete, pool)
+    turn = ctx(athlete, pool, real_clock=True)
 
     await run_turn(graph, turn, "surfed somewhere up north", model_name="m")
     await run_turn(graph, turn, "how much did I train this week?", model_name="m")
 
     [row] = await surf_rows(pool, athlete)
     assert (row["spot"], row["waves_caught"]) == (None, 4)
+    # The model is told what the athlete actually said, so it can answer that too.
+    tool_result = next(m for m in model.seen[-1] if isinstance(m, ToolMessage))
+    assert "how much did I train this week?" in tool_result.text
+    # The session keeps the time the athlete reported it, not the time they answered.
+    assert abs(row["started_at"] - datetime.now(UTC)) < timedelta(minutes=5)
+
+
+async def test_a_typo_in_the_answer_logs_there_but_teaches_no_alias(
+    pool: Pool, athlete: Athlete
+) -> None:
+    await seeded(pool, athlete)
+    model = scripted(log_call(spot="the cove"), "Logged.")
+    graph = build_graph(model, SURF, InMemorySaver())
+    turn = ctx(athlete, pool, real_clock=True)
+
+    await run_turn(graph, turn, "the cove this morning", model_name="m")
+    await run_turn(graph, turn, "burleigh heds", model_name="m")
+
+    [row] = await surf_rows(pool, athlete)
+    assert row["spot"] == "Burleigh Heads"
+    async with pool.connection() as conn:
+        assert await resolve_spot(conn, athlete, "the cove") is None
 
 
 async def test_context_summarises_recent_surfing(pool: Pool, athlete: Athlete) -> None:

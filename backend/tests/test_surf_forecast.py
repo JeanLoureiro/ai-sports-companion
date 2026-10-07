@@ -72,8 +72,10 @@ def test_rating_rewards_size_period_direction_and_offshore_wind() -> None:
         "2026-10-08T14:00", swell_m=1.2, period_s=11, swell_from=110, wind_kn=18, wind_from=60
     )
     flat = hour("2026-10-08T06:00", swell_m=0.3, swell_from=20)
+    flat_but_pretty = hour("2026-10-08T06:00", swell_m=0.2, swell_from=110, wind_kn=3)
 
-    assert (rate(SNAPPER, perfect), rate(SNAPPER, blown_out), rate(SNAPPER, flat)) == (5, 3, 1)
+    assert (rate(SNAPPER, perfect), rate(SNAPPER, blown_out), rate(SNAPPER, flat)) == (5, 3, 0)
+    assert rate(SNAPPER, flat_but_pretty) == 0  # direction and wind do not matter when flat
 
 
 def test_tide_events_are_local_extremes() -> None:

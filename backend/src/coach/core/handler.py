@@ -10,7 +10,7 @@ from coach.core.deps import Deps
 from coach.core.models import Location
 from coach.core.repo import claim_update, get_athlete_by_chat_id, undo_session
 from coach.core.telegram import CallbackQuery, TelegramError, Update
-from coach.core.turn import note_in_thread, run_turn
+from coach.core.turn import has_pending_question, note_in_thread, run_turn
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,9 @@ async def _handle_callback(deps: Deps, update_id: int, query: CallbackQuery) -> 
     note = f"Undone: {summary}."
     await deps.telegram.answer_callback(query.id, "Undone.")
     await deps.telegram.send_message(chat_id, note)
-    await note_in_thread(deps.graph, athlete, note)
+    # A note would close the open question; the athlete's next message still answers it.
+    if not await has_pending_question(deps.graph, athlete):
+        await note_in_thread(deps.graph, athlete, note)
 
 
 def _undo_target(data: str | None) -> UUID | None:

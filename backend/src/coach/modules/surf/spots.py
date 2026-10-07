@@ -54,8 +54,10 @@ async def list_spots(conn: Connection, athlete: Athlete) -> list[dict[str, Any]]
     return await cur.fetchall()
 
 
-async def resolve_spot(conn: Connection, athlete: Athlete, said: str) -> dict[str, Any] | None:
-    """Exact name or alias first, then a single close match (typos); otherwise None."""
+async def resolve_spot(
+    conn: Connection, athlete: Athlete, said: str, *, fuzzy: bool = True
+) -> dict[str, Any] | None:
+    """Exact name or alias first, then (if ``fuzzy``) a single close match; otherwise None."""
     wanted = normalize(said)
     if not wanted:
         return None
@@ -66,6 +68,8 @@ async def resolve_spot(conn: Connection, athlete: Athlete, said: str) -> dict[st
     for key in (wanted, wanted.replace(" ", "")):
         if key in by_key:
             return by_key[key]
+    if not fuzzy:
+        return None
     close = {
         by_key[k]["id"]: by_key[k] for k in difflib.get_close_matches(wanted, by_key, cutoff=0.85)
     }

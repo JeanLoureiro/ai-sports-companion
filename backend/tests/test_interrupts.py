@@ -1,7 +1,8 @@
 import json
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
 from coach.core.context import CoachContext
@@ -58,10 +59,9 @@ async def test_an_interrupt_question_is_the_reply_and_the_next_message_answers_i
     assert first.reply == "Where was that?"
     assert second.reply == "Logged at Burleigh."
     tool_result = next(m for m in model.seen[-1] if isinstance(m, ToolMessage))
-    assert json.loads(tool_result.text.removeprefix("answer: ")) == {
-        "text": "Burleigh",
-        "location": None,
-    }
+    answer = json.loads(tool_result.text.removeprefix("answer: "))
+    assert (answer["text"], answer["location"]) == ("Burleigh", None)
+    assert answer["asked_at"]  # when the question was asked, so logs keep that time
 
 
 async def test_a_location_pin_answers_a_pending_question(pool: Pool, athlete: Athlete) -> None:
@@ -98,3 +98,45 @@ async def test_a_location_without_a_question_is_an_ordinary_message(
 
     assert recorder.sent_texts() == ["Nice spot."]
     assert model.seen[0][-1].text == "(shared a location)"
+
+
+async def test_a_stale_question_does_not_capture_a_new_message(
+    pool: Pool, athlete: Athlete
+) -> None:
+    model = scripted(ask("Where was that?"), "Here is your week.")
+    graph = build_graph(model, ASK, InMemorySaver())
+    asked = CoachContext(athlete=athlete, pool=pool, registry=ASK)
+    later = CoachContext(
+        athlete=athlete,
+        pool=pool,
+        registry=ASK,
+        now=lambda: datetime.now(UTC) + timedelta(hours=7),
+    )
+
+    await run_turn(graph, asked, "surfed this morning", model_name="m")
+    result = await run_turn(graph, later, "how much did I train this week?", model_name="m")
+
+    assert result.reply == "Here is your week."
+    last_prompt = model.seen[-1]
+    assert isinstance(last_prompt[-1], HumanMessage)
+    assert last_prompt[-1].text == "how much did I train this week?"
+
+
+async def test_the_resumed_turn_records_the_tool_call_it_completed(
+    pool: Pool, athlete: Athlete
+) -> None:
+    model = scripted(ask("Where was that?"), "Logged.")
+    graph = build_graph(model, ASK, InMemorySaver())
+    ctx = CoachContext(athlete=athlete, pool=pool, registry=ASK)
+
+    await run_turn(graph, ctx, "surfed", model_name="m")
+    resumed = await run_turn(graph, ctx, "Burleigh", model_name="m")
+
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "select tool_calls from agent_runs where id = %s", (resumed.run_id,)
+        )
+        row = await cur.fetchone()
+    assert row is not None
+    [call] = row["tool_calls"]
+    assert (call["tool"], call["status"]) == ("ask_tool", "success")

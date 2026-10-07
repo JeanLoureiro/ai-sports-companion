@@ -146,12 +146,13 @@ async def create_session(
     rpe: int | None = None,
     summary: str | None = None,
     input_type: str = "text",
+    call_id: str | None = None,
 ) -> UUID:
-    """Insert one training session in any discipline."""
+    """Insert one training session in any discipline; ``call_id`` is the tool call writing it."""
     cur = await conn.execute(
         "insert into sessions (athlete_id, discipline, started_at, duration_min, rpe, summary, "
-        "input_type) values (%s, %s, %s, %s, %s, %s, %s) returning id",
-        (athlete.id, discipline, started_at, duration_min, rpe, summary, input_type),
+        "input_type, source_call_id) values (%s, %s, %s, %s, %s, %s, %s, %s) returning id",
+        (athlete.id, discipline, started_at, duration_min, rpe, summary, input_type, call_id),
     )
     session_id: UUID = (await _one(cur))["id"]
     return session_id
@@ -167,3 +168,15 @@ async def undo_session(conn: Connection, athlete: Athlete, session_id: UUID) -> 
     if row is None:
         return None
     return str(row["summary"] or "a session")
+
+
+async def session_for_call(conn: Connection, athlete: Athlete, call_id: str | None) -> UUID | None:
+    """The session a tool call already wrote, if it runs again (e.g. on an interrupt resume)."""
+    if not call_id:
+        return None
+    cur = await conn.execute(
+        "select id from sessions where athlete_id = %s and source_call_id = %s",
+        (athlete.id, call_id),
+    )
+    row = await cur.fetchone()
+    return row["id"] if row else None

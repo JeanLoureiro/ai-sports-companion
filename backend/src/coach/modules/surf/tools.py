@@ -3,6 +3,7 @@
 import json
 from datetime import datetime, timedelta
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolRuntime
@@ -11,7 +12,7 @@ from pydantic import Field
 
 from coach.core.context import CoachContext
 from coach.core.models import Location, ReplyButton
-from coach.core.repo import create_session
+from coach.core.repo import create_session, session_for_call
 from coach.modules.surf.forecast import (
     ESTIMATE_NOTE,
     ForecastError,
@@ -50,6 +51,9 @@ async def get_surf_forecast(
             rows = [found]
         else:
             rows = [s for s in await list_spots(conn, ctx.athlete) if s["favourite"]]
+    # Hours already gone today are not a forecast.
+    local_now = ctx.now().astimezone(ZoneInfo(ctx.athlete.timezone)).replace(tzinfo=None)
+    this_hour = local_now.replace(minute=0, second=0, microsecond=0)
     report = []
     for row in rows:
         target = Spot.from_row(row)
@@ -57,6 +61,7 @@ async def get_surf_forecast(
             hours = await fetch_hours(ctx.http, target, days=days, timezone=ctx.athlete.timezone)
         except ForecastError as err:
             return _dump({"error": str(err)})
+        hours = [h for h in hours if h.time >= this_hour]
         report.append(
             {"name": target.name, "windows": windows(target, hours), "tides": tide_events(hours)}
         )
@@ -132,8 +137,13 @@ async def log_surf_session(
     For an unknown spot the athlete is asked for a location pin first."""
     ctx = runtime.context
     async with ctx.pool.connection() as conn:
+        already = await session_for_call(conn, ctx.athlete, runtime.tool_call_id)
+        if already is not None:
+            return f"Already logged by this call (session {already})."
         found = await resolve_spot(conn, ctx.athlete, spot)
         names = [s["name"] for s in await list_spots(conn, ctx.athlete)]
+    when = ctx.local_to_utc(started_at)
+    unanswered = ""
     if found is None:
         # The tool runs again from the top when the athlete answers: nothing is written before.
         answer = interrupt(
@@ -145,6 +155,13 @@ async def log_surf_session(
             }
         )
         found = await _spot_from_answer(ctx, spot, answer)
+        if started_at is None and answer.get("asked_at"):
+            when = datetime.fromisoformat(answer["asked_at"])  # when they reported it
+        if found is None and answer.get("text") and not answer.get("location"):
+            unanswered = (
+                f" The athlete replied {answer['text']!r} instead of naming a spot: "
+                "answer that message too."
+            )
     details = {
         "spot_id": found["id"] if found else None,
         "wave_height_min_ft": wave_height_min_ft,
@@ -161,16 +178,17 @@ async def log_surf_session(
             conn,
             ctx.athlete,
             discipline="surf",
-            started_at=ctx.local_to_utc(started_at),
+            started_at=when,
             duration_min=duration_min,
             rpe=rpe,
             summary=f"Surf at {place}",
+            call_id=runtime.tool_call_id,
         )
         await insert_details(conn, session_id, details)
     ctx.reply_buttons.append(ReplyButton(text="Undo", data=f"undo:{session_id}"))
     saved = "" if found else " (not a saved spot: logged without one)"
     logged = {k: v for k, v in details.items() if v is not None and k != "spot_id"}
-    return f"Logged surf at {place}{saved}. Details: {_dump(logged)}"
+    return f"Logged surf at {place}{saved}. Details: {_dump(logged)}.{unanswered}"
 
 
 async def _spot_from_answer(
@@ -186,7 +204,9 @@ async def _spot_from_answer(
                 said.strip().title(),
                 Location(location["latitude"], location["longitude"]),
             )
-        named = await resolve_spot(conn, ctx.athlete, answer.get("text") or "")
-        if named is not None:
+        text = answer.get("text") or ""
+        named = await resolve_spot(conn, ctx.athlete, text)
+        # Learn the new name only from an exact answer, so a typo cannot teach a wrong alias.
+        if named is not None and await resolve_spot(conn, ctx.athlete, text, fuzzy=False):
             await add_alias(conn, named["id"], said.strip())
         return named

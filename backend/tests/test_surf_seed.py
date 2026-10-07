@@ -76,3 +76,14 @@ def test_shipped_spot_names_canonicalize_for_eval_scoring() -> None:
     assert surf.canonical("dbah") == surf.canonical("D'Bah") == "Duranbah"
     assert surf.canonical("currumbin") == "Currumbin Alley"
     assert surf.canonical("kirra") is None
+
+
+async def test_reseeding_keeps_names_the_athlete_taught(conn: Connection, athlete: Athlete) -> None:
+    await seed_spots(conn, athlete, load_spots(SPOTS_PATH))
+    burleigh = await resolve_spot(conn, athlete, "burleigh")
+    assert burleigh is not None
+    await add_alias(conn, burleigh["id"], "the point")
+
+    await seed_spots(conn, athlete, load_spots(SPOTS_PATH))
+
+    assert await resolve_spot(conn, athlete, "the point") is not None
