@@ -18,12 +18,20 @@ class Chat(BaseModel):
     id: int
 
 
+class TgLocation(BaseModel):
+    """A location pin."""
+
+    latitude: float
+    longitude: float
+
+
 class Message(BaseModel):
-    """A message; ``text`` is None for photos, voice notes and stickers."""
+    """A message; ``text`` is None for photos, voice notes, stickers and location pins."""
 
     message_id: int
     chat: Chat
     text: str | None = None
+    location: TgLocation | None = None
 
 
 class CallbackQuery(BaseModel):

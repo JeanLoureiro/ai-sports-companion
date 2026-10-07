@@ -7,13 +7,16 @@ import httpx
 
 from coach.core.context import CoachContext
 from coach.core.deps import Deps
+from coach.core.models import Location
 from coach.core.repo import claim_update, get_athlete_by_chat_id, undo_session
 from coach.core.telegram import CallbackQuery, TelegramError, Update
-from coach.core.turn import note_in_thread, run_turn
+from coach.core.turn import has_pending_question, note_in_thread, run_turn
 
 logger = logging.getLogger(__name__)
 
-UNSUPPORTED_REPLY = "I can only read text messages for now. Voice notes and photos are coming soon."
+UNSUPPORTED_REPLY = (
+    "I can read text and location pins for now. Voice notes and photos are coming soon."
+)
 
 
 async def handle_update(deps: Deps, update: Update) -> None:
@@ -37,15 +40,23 @@ async def handle_update(deps: Deps, update: Update) -> None:
             "chat %s is allowlisted but has no athlete; run `coach add-athlete`", chat_id
         )
         return
-    if not message.text:
+    if not message.text and message.location is None:
         await deps.telegram.send_message(chat_id, UNSUPPORTED_REPLY)
         return
+    location = (
+        Location(message.location.latitude, message.location.longitude)
+        if message.location
+        else None
+    )
+    text = message.text or "(shared a location)"
     try:
         await deps.telegram.send_typing(chat_id)
     except (TelegramError, httpx.HTTPError) as err:
         logger.warning("typing indicator failed (%s); answering anyway", type(err).__name__)
-    ctx = CoachContext(athlete=athlete, pool=deps.pool, registry=deps.registry)
-    result = await run_turn(deps.graph, ctx, message.text, model_name=deps.settings.agent_model)
+    ctx = CoachContext(athlete=athlete, pool=deps.pool, registry=deps.registry, http=deps.http)
+    result = await run_turn(
+        deps.graph, ctx, text, model_name=deps.settings.agent_model, location=location
+    )
     await deps.telegram.send_message(chat_id, result.reply, ctx.reply_buttons)
 
 
@@ -74,7 +85,9 @@ async def _handle_callback(deps: Deps, update_id: int, query: CallbackQuery) -> 
     note = f"Undone: {summary}."
     await deps.telegram.answer_callback(query.id, "Undone.")
     await deps.telegram.send_message(chat_id, note)
-    await note_in_thread(deps.graph, athlete, note)
+    # A note would close the open question; the athlete's next message still answers it.
+    if not await has_pending_question(deps.graph, athlete):
+        await note_in_thread(deps.graph, athlete, note)
 
 
 def _undo_target(data: str | None) -> UUID | None:

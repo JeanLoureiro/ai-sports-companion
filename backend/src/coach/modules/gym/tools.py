@@ -1,9 +1,8 @@
 """Gym tools bound to the agent."""
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Annotated, Any
-from zoneinfo import ZoneInfo
 
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolRuntime
@@ -12,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from coach.core.context import CoachContext
 from coach.core.db import Connection
 from coach.core.models import Athlete, ReplyButton
-from coach.core.repo import create_session
+from coach.core.repo import create_session, session_for_call
 from coach.core.tools import history_window
 from coach.modules.gym.library import ExerciseIndex, library_index, normalize
 from coach.modules.gym.repo import (
@@ -158,14 +157,6 @@ def _day_label(day: str) -> str | None:
     return words[0].upper() if len(words) == 1 and len(words[0]) == 1 else None
 
 
-def _started_at(value: datetime | None, ctx: CoachContext) -> datetime:
-    if value is None:
-        return ctx.now()
-    if value.tzinfo is None:
-        return value.replace(tzinfo=ZoneInfo(ctx.athlete.timezone)).astimezone(UTC)
-    return value
-
-
 @tool
 async def log_gym_session(
     runtime: ToolRuntime[CoachContext],
@@ -192,6 +183,9 @@ async def log_gym_session(
     index = library_index()
     label_day = _day_label(day) if day else None
     async with ctx.pool.connection() as conn, conn.transaction():
+        already = await session_for_call(conn, ctx.athlete, runtime.tool_call_id)
+        if already is not None:
+            return f"Already logged by this call (session {already})."
         program = await active_program(conn, ctx.athlete)
         planned = None
         if program is not None:
@@ -210,10 +204,11 @@ async def log_gym_session(
             conn,
             ctx.athlete,
             discipline="gym",
-            started_at=_started_at(started_at, ctx),
+            started_at=ctx.local_to_utc(started_at),
             duration_min=duration_min,
             rpe=rpe,
             summary=label,
+            call_id=runtime.tool_call_id,
         )
         await insert_details(conn, session_id, planned["id"] if planned else None, entries, notes)
         if planned is not None:

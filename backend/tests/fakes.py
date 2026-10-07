@@ -18,6 +18,7 @@ from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool, tool
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import ToolRuntime
+from langgraph.types import interrupt
 from pydantic import Field
 
 from coach.core.config import Settings
@@ -152,6 +153,7 @@ def make_deps(
     *,
     allowed: list[int],
     registry: Registry | None = None,
+    http: httpx.AsyncClient | None = None,
 ) -> Deps:
     settings = Settings.model_validate(
         {
@@ -170,6 +172,8 @@ def make_deps(
         registry=registry,
         graph=build_graph(model, registry, InMemorySaver()),
         telegram=recorder.client(),
+        http=http
+        or httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(404))),
     )
 
 
@@ -210,5 +214,25 @@ def callback_update(update_id: int, chat_id: int, data: str) -> dict[str, Any]:
             "from": {"id": chat_id, "is_bot": False, "first_name": "T"},
             "data": data,
             "message": {"message_id": 9, "chat": {"id": chat_id, "type": "private"}},
+        },
+    }
+
+
+@tool
+async def ask_tool(question: str) -> str:
+    """Ask the athlete something and wait for the answer."""
+    answer = interrupt({"question": question})
+    return f"answer: {json.dumps(answer)}"
+
+
+def location_update(
+    update_id: int, chat_id: int, latitude: float, longitude: float
+) -> dict[str, Any]:
+    return {
+        "update_id": update_id,
+        "message": {
+            "message_id": 1,
+            "chat": {"id": chat_id, "type": "private"},
+            "location": {"latitude": latitude, "longitude": longitude},
         },
     }

@@ -43,6 +43,11 @@ class GymModule:
             f"{week['done']}/{week['target']} this week, {next_part}."
         )
 
+    def canonical(self, name: str) -> str | None:
+        """The library name for an exercise name or alias, for eval scoring."""
+        exercise = library_index().resolve(name)
+        return exercise.name if exercise else None
+
     def jobs(self) -> list[ScheduledJob]:
         return []
 

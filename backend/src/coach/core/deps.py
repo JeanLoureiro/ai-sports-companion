@@ -24,6 +24,7 @@ class Deps:
     registry: Registry
     graph: CoachGraph
     telegram: TelegramClient
+    http: httpx.AsyncClient
 
 
 @asynccontextmanager
@@ -42,7 +43,12 @@ async def build_deps(settings: Settings) -> AsyncIterator[Deps]:
             )
             telegram = TelegramClient(settings.telegram_bot_token.get_secret_value(), http)
             yield Deps(
-                settings=settings, pool=pool, registry=registry, graph=graph, telegram=telegram
+                settings=settings,
+                pool=pool,
+                registry=registry,
+                graph=graph,
+                telegram=telegram,
+                http=http,
             )
     finally:
         await pool.close()

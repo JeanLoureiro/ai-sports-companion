@@ -115,8 +115,10 @@ Program changes never block the conversation.
 The button callback applies or declines the row in code and adds a note to the thread.
 Proposals expire at the affected session's planned date.
 
-LangGraph's `interrupt()` is used only for log blockers that are detected in code (unknown surf spot, ambiguous program session, unresolvable date).
-The next message from the athlete always resumes it; it is never abandoned.
+LangGraph's `interrupt()` is used only for log blockers that are detected in code (today: an unknown surf spot).
+`run_turn` checks the thread for a pending interrupt before each message: if there is one, the message resumes it as `{"text": ..., "location": {...} | None}` instead of starting a new turn, so it is never abandoned, and a Telegram location pin is a valid answer.
+When a turn ends interrupted, the interrupt's `question` is the reply.
+The interrupted tool runs again from the top on resume, so tools write nothing before they interrupt.
 
 ## Code map
 
@@ -132,7 +134,8 @@ backend/src/coach/
     migrations/        core SQL
     repo.py            all SQL for core tables
     registry.py        DisciplineModule protocol, ScheduledJob, Registry, default_registry
-    context.py         CoachContext: athlete, pool, registry, clock, reply buttons
+    context.py         CoachContext: athlete, pool, registry, clock, http client, reply buttons, local_to_utc
+    text.py            normalize and make_canonicalizer, shared by every module
     prompt.py          system prompt assembly
     tools.py           core tools (query_history)
     llm.py             the only place that names a model provider
@@ -155,7 +158,16 @@ backend/src/coach/
       programs/        sample.yaml (public); real programs are private and git-ignored
       migrations/      gym SQL
       evals/           extraction.yaml + recordings/
-    surf/              planned, week 3
+    surf/
+      module.py        SurfModule: tools, prompt, context, evals, canonical spot names
+      spots.py         spot profiles; resolving names, aliases and typos
+      forecast.py      Open-Meteo client; compass, wind relation, rating, tides, windows
+      repo.py          surf SQL
+      tools.py         log_surf_session (unknown spot -> location pin), get_surf_forecast, surf_history
+      seed.py          python -m coach.modules.surf.seed
+      spots.yaml       public spot profiles (edit, then re-seed)
+      migrations/      surf SQL
+      evals/           extraction.yaml + recordings/
     bjj/               planned, phase 2
 dashboard/             planned, week 7
 supabase/              local database config for development and CI
@@ -178,7 +190,7 @@ A discipline is a folder under `coach/modules/` that implements `DisciplineModul
 | `evals()` | Public synthetic eval cases. |
 
 Enabling a module means adding it to `default_registry()` in `registry.py` (a local import, because modules import from the core).
-Modules can also put inline buttons under the reply through `CoachContext.reply_buttons`.
+Modules can also put inline buttons under the reply through `CoachContext.reply_buttons`, call external APIs through `CoachContext.http` (a mock transport in tests), and offer an optional `canonical(name)` hook that eval scoring uses to compare names.
 The `Registry` rejects duplicate module names and duplicate tool names at startup, and `build_graph` rejects a module tool that shadows a core tool.
 
 Rules that keep "add a sport without touching the core" true:
@@ -224,6 +236,15 @@ The gym module adds:
 | `program_sessions` | The ordered sequence; a session is pending until a logged session completes it or it is skipped. |
 | `program_exercises` | Each session's prescriptions: block (prep or main), sets, reps, rest, tempo, notes. |
 | `gym_details` | Per logged session: the program session it completed and the main lifts with any loads, swaps and skips. |
+
+The surf module adds:
+
+| Table | Holds |
+| --- | --- |
+| `surf_spots` | The athlete's spots: name, aliases, coordinates, favourite, and a profile (swell directions it works with, offshore wind directions, minimum swell). |
+| `surf_details` | Per logged session: spot, wave heights in feet, wind, tide, waves caught, board, notes. |
+
+Surf forecasts come from Open-Meteo's regional model, so nearby spots share the same swell and tide numbers; each spot's profile turns them into a 0 to 5 rating per morning, midday and afternoon, and every answer is labelled an estimate.
 
 Migrations are plain SQL files run by `coach migrate`, recorded in `coach_migrations`, each applied in its own transaction.
 Time-based questions ("this week", "last week") use calendar weeks that start Monday 00:00 in the athlete's time zone, never UTC, and session times are reported in local time with their weekday.

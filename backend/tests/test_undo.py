@@ -14,6 +14,7 @@ from tests.factories import new_chat_id, new_update_id
 from tests.fakes import (
     FakeModule,
     TelegramRecorder,
+    ask_tool,
     button_tool,
     callback_update,
     make_deps,
@@ -175,3 +176,39 @@ async def test_callbacks_from_other_chats_are_ignored(pool: Pool, athlete: Athle
 
     assert recorder.calls == []
     assert await session_exists(pool, session_id)
+
+
+async def test_undo_while_a_question_is_pending_keeps_the_question(
+    pool: Pool, athlete: Athlete
+) -> None:
+    assert athlete.telegram_chat_id is not None
+    session_id = await a_logged_session(pool, athlete)
+    recorder = TelegramRecorder()
+    model = scripted(
+        AIMessage(
+            content="",
+            tool_calls=[{"name": "ask_tool", "args": {"question": "Where?"}, "id": "q1"}],
+        )
+    )
+    deps = make_deps(
+        pool,
+        model,
+        recorder,
+        allowed=[athlete.telegram_chat_id],
+        registry=Registry([FakeModule(module_tools=[ask_tool], context_text="")]),
+    )
+    await handle_update(
+        deps, Update.model_validate(text_update(new_update_id(), athlete.telegram_chat_id))
+    )
+
+    await handle_update(
+        deps,
+        Update.model_validate(
+            callback_update(new_update_id(), athlete.telegram_chat_id, f"undo:{session_id}")
+        ),
+    )
+
+    assert not await session_exists(pool, session_id)
+    config: RunnableConfig = {"configurable": {"thread_id": str(athlete.id)}}
+    state = await deps.graph.aget_state(config)
+    assert [i for t in state.tasks for i in t.interrupts]  # the question is still open

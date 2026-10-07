@@ -39,3 +39,11 @@ class ReplyButton:
 
     text: str
     data: str
+
+
+@dataclass(frozen=True, slots=True)
+class Location:
+    """A point the athlete shared, e.g. a Telegram location pin."""
+
+    latitude: float
+    longitude: float

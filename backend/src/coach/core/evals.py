@@ -27,6 +27,7 @@ from pydantic import BaseModel
 from coach.core.models import Athlete
 from coach.core.prompt import system_prompt
 from coach.core.registry import Registry
+from coach.core.text import make_canonicalizer
 from coach.core.tools import CORE_TOOLS
 
 type Normalizer = Callable[[str], str]
@@ -190,9 +191,11 @@ async def _run(args: argparse.Namespace) -> None:
     from coach.core.db import create_pool
     from coach.core.llm import get_chat_model
     from coach.core.registry import default_registry
-    from coach.modules.gym.library import canonical_name  # the only normalizer so far
 
     registry = default_registry()
+    canonical = make_canonicalizer(
+        [hook for m in registry.modules if (hook := getattr(m, "canonical", None))]
+    )
     current = fingerprint(registry)
     results: dict[str, dict[str, Any]] = {}
     failures: list[str] = []
@@ -230,7 +233,7 @@ async def _run(args: argparse.Namespace) -> None:
                     raise SystemExit(f"{eval_set.name}: {err}") from err
                 predictions = recorded["cases"]
             scores = [
-                score_case(c, eval_set.tool, predictions.get(c.id, []), canonical_name)
+                score_case(c, eval_set.tool, predictions.get(c.id, []), canonical)
                 for c in eval_set.cases
             ]
             results[eval_set.name] = summarize(scores)

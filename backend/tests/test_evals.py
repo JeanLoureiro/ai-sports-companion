@@ -114,3 +114,10 @@ def test_scores_below_the_bar_fail() -> None:
         "tool_accuracy 0.70 < 0.80",
         "recall 0.60 < 0.80",
     ]
+
+
+def test_the_surf_set_has_fifteen_cases() -> None:
+    from coach.modules.surf.module import SurfModule
+
+    [path] = SurfModule().evals()
+    assert len(load_set(path).cases) == 15

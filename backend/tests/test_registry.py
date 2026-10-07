@@ -12,8 +12,8 @@ from tests.fakes import FakeModule, fake_lookup
 ATHLETE = Athlete(id=uuid4(), name="Jean", timezone="Australia/Brisbane", telegram_chat_id=1)
 
 
-def test_gym_is_enabled() -> None:
-    assert [m.name for m in default_registry().modules] == ["gym"]
+def test_gym_and_surf_are_enabled() -> None:
+    assert [m.name for m in default_registry().modules] == ["gym", "surf"]
 
 
 def test_rejects_duplicate_module_names() -> None:

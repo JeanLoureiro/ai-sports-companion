@@ -94,7 +94,8 @@ class Registry:
 
 
 def default_registry() -> Registry:
-    """The enabled discipline modules, in migration order. Week 3 adds SurfModule()."""
+    """The enabled discipline modules, in migration order. Phase 2 adds BJJ."""
     from coach.modules.gym.module import GymModule  # local: modules import from the core
+    from coach.modules.surf.module import SurfModule
 
-    return Registry([GymModule()])
+    return Registry([GymModule(), SurfModule()])

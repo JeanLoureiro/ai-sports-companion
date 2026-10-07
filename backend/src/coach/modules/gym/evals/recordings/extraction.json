@@ -1,6 +1,6 @@
 {
   "model": "claude-haiku-4-5-20251001",
-  "fingerprint": "b07cc782da61a74a",
+  "fingerprint": "55da8b14658ab3de",
   "cases": {
     "gym-01": [
       {
@@ -24,11 +24,11 @@
           "day": "B",
           "lifts": [
             {
-              "exercise": "Agachamento terra sumo",
+              "exercise": "sumo",
               "load_kg": 24
             },
             {
-              "exercise": "Serrote",
+              "exercise": "serrote",
               "load_kg": 18
             }
           ],
@@ -51,7 +51,7 @@
           "day": "C",
           "lifts": [
             {
-              "exercise": "side lunge",
+              "exercise": "Side lunge",
               "skipped": true
             }
           ]
@@ -86,7 +86,7 @@
           "rpe": 7,
           "lifts": [
             {
-              "exercise": "Agachamento terra sumo",
+              "exercise": "sumo deadlift",
               "load_kg": 26
             }
           ]
@@ -122,19 +122,19 @@
           "day": "A",
           "lifts": [
             {
-              "exercise": "Agachamento goblet",
+              "exercise": "agachamento goblet",
               "load_kg": 24
             },
             {
-              "exercise": "Remada curvada",
+              "exercise": "remada",
               "load_kg": 22
             },
             {
-              "exercise": "Supino reto com halter",
+              "exercise": "supino reto com halter",
               "load_kg": 20
             },
             {
-              "exercise": "Afundo",
+              "exercise": "afundo",
               "load_kg": 12
             }
           ],
@@ -166,7 +166,7 @@
       {
         "name": "log_gym_session",
         "args": {
-          "day": "A",
+          "day": null,
           "duration_min": 55
         }
       }
@@ -209,7 +209,7 @@
           "rpe": 8,
           "lifts": [
             {
-              "exercise": "sumo",
+              "exercise": "Agachamento terra sumo",
               "load_kg": 24
             },
             {

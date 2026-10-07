@@ -1,7 +1,5 @@
 """The exercise library and name matching across Portuguese names and English aliases."""
 
-import re
-import unicodedata
 from collections.abc import Iterator
 from functools import cache
 from pathlib import Path
@@ -9,6 +7,10 @@ from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict
+
+from coach.core.text import normalize
+
+__all__ = ["normalize"]  # re-exported: gym code and tests import it from here
 
 LIBRARY_PATH = Path(__file__).parent / "exercises.yaml"
 
@@ -24,13 +26,6 @@ type Pattern = Literal[
     "stability",
     "plyometric",
 ]
-
-
-def normalize(text: str) -> str:
-    """Casefold, strip accents, turn punctuation into single spaces (keeps '/' for 90/90)."""
-    decomposed = unicodedata.normalize("NFKD", text.casefold())
-    plain = "".join(c for c in decomposed if not unicodedata.combining(c))
-    return " ".join(re.sub(r"[^a-z0-9/]+", " ", plain).split())
 
 
 class ExerciseDef(BaseModel):
