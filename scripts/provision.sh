@@ -252,6 +252,7 @@ write_env PROD_TELEGRAM_BOT_TOKEN "$PROD_TELEGRAM_BOT_TOKEN"
 
 stage "Telegram: your chat id"
 say "Only your chat may talk to the coach, so we need its id."
+warn "Stop any local 'coach poll' first: it would read this message before the wizard does."
 step "Open your DEV bot in Telegram, press Start, and send it any message (e.g. 'hi')."
 pause "Press Enter once you've sent it."
 CHAT_ID=$(chat_id_from_updates "$COACH_TELEGRAM_BOT_TOKEN" || true)
@@ -298,6 +299,17 @@ if ! (cd backend && COACH_DATABASE_URL="$PROD_DATABASE_URL" uv run coach migrate
 fi
 (cd backend && COACH_DATABASE_URL="$PROD_DATABASE_URL" \
   uv run coach add-athlete --name "$ATHLETE_NAME" --chat-id "$CHAT_ID")
+say "Production: your surf spots and gym program."
+(cd backend && COACH_DATABASE_URL="$PROD_DATABASE_URL" \
+  uv run python -m coach.modules.surf.seed --chat-id "$CHAT_ID")
+PROGRAM_FILE="docs/trainings/forca-3x-halter.yaml"
+if [[ -f "$PROGRAM_FILE" ]]; then
+  (cd backend && COACH_DATABASE_URL="$PROD_DATABASE_URL" \
+    uv run python -m coach.modules.gym.seed --program "../$PROGRAM_FILE" --chat-id "$CHAT_ID") \
+    || note "Gym program already seeded in production; keeping it (re-seed with --replace)."
+else
+  warn "No private program at $PROGRAM_FILE; seed one later with python -m coach.modules.gym.seed."
+fi
 say "Local (Docker), so local runs never touch your real coach memory:"
 supabase db start
 (cd backend && uv run coach migrate)
